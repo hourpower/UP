@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hour Power — Hour Registration</title>
+<link rel="stylesheet" href="fonts.css?v=202608012044" />
+<link rel="stylesheet" href="styles.css?v=202608012044" />
+</head>
+<body>
+
+<div id="setupNotice" class="setup-notice hidden">
+  <strong>Setup needed.</strong> Open <code>config.js</code> and paste in your Firebase project keys — see README.md for the walkthrough.
+</div>
+
+<!-- AUTH SCREEN -->
+<section id="authScreen" class="auth-screen">
+  <div class="ledger-bg" aria-hidden="true"></div>
+  <div class="auth-card">
+    <h1 class="brand">Hour Power</h1>
+    <p class="brand-sub">Hour registration, kept simple.</p>
+
+    <div id="authError" class="form-error hidden"></div>
+
+    <form id="loginForm" class="auth-form">
+      <label>Email
+        <input type="email" id="loginEmail" required autocomplete="email" />
+      </label>
+      <label>Password
+        <input type="password" id="loginPassword" required autocomplete="current-password" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Sign in</button>
+    </form>
+
+    <button id="forgotPasswordBtn" class="link-btn hidden" type="button" style="margin-top:10px">Forgot password? Send me a reset link</button>
+    <div id="forgotMsg" class="hidden" style="margin-top:10px;font-size:0.82rem"></div>
+
+    <form id="signupForm" class="auth-form hidden">
+      <label>Your name
+        <input type="text" id="signupName" required autocomplete="name" />
+      </label>
+      <label>Email <span class="optional">must be @urbanpower.dk</span>
+        <input type="email" id="signupEmail" required autocomplete="email" />
+      </label>
+      <label>Password <span class="optional">min. 8 characters — must include uppercase, lowercase, number and special character</span>
+        <input type="password" id="signupPassword" required minlength="8" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="btn btn-primary btn-block">Create account</button>
+    </form>
+
+    <button id="toggleAuthMode" class="link-btn" type="button">Need an account? Create one</button>
+  </div>
+</section>
+
+<!-- VERIFICATION SCREEN -->
+<section id="verifyScreen" class="auth-screen hidden">
+  <div class="ledger-bg" aria-hidden="true"></div>
+  <div class="auth-card">
+    <h1 class="brand">Check your email</h1>
+    <p class="brand-sub">A verification link has been sent to <strong id="verifyEmail"></strong>. Click it, then come back here and sign in.</p>
+    <div id="verifyError" class="form-error hidden"></div>
+    <button id="resendVerifyBtn" class="btn btn-primary btn-block" type="button">Resend verification email</button>
+    <button id="verifyLogoutBtn" class="btn btn-ghost btn-block" style="margin-top:10px" type="button">Back to sign in</button>
+  </div>
+</section>
+
+<!-- APP SCREEN -->
+<div id="appScreen" class="app-screen hidden">
+  <header class="topbar">
+    <img src="logo.png" alt="Urban Power — Architecture + Urbanism" class="brand-logo" />
+    <div class="topbar-right">
+      <span id="whoami" class="whoami"></span>
+      <button id="logoutBtn" class="btn btn-ghost">Log out</button>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <!-- USER VIEW -->
+    <section id="userView" class="view hidden">
+      <div class="card">
+        <div class="card-header-row card-toggle" id="hoursCardToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2 id="hoursHeading">Hours this week <span class="chevron" id="hoursCardChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <button id="weekPrevBtn" class="btn btn-ghost" type="button" aria-label="Previous week">‹</button>
+            <span id="weekLabel" class="week-label"></span>
+            <button id="weekNextBtn" class="btn btn-ghost" type="button" aria-label="Next week">›</button>
+            <button id="weekTodayBtn" class="btn btn-ghost" type="button">This week</button>
+          </div>
+        </div>
+        <div id="hoursCardBody" class="collapsible-body">
+          <p class="grid-hint" style="margin-bottom:10px">Type hours into a cell and click elsewhere (or press Enter) to save it. Leave a cell empty to clear it.</p>
+          <div class="table-wrap">
+            <table class="ledger-table grid-table" id="weekGridTable">
+              <thead><tr id="weekGridHeadRow"></tr></thead>
+              <tbody id="weekGridBody"></tbody>
+              <tfoot id="weekGridFoot"></tfoot>
+            </table>
+          </div>
+          <p id="noProjectsState" class="empty-state hidden">You don't have any projects assigned yet — ask your editor to add you to one.</p>
+        </div>
+      </div>
+
+      <div id="flexCard" class="card hidden">
+        <div class="card-header-row card-toggle" id="flexToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Balance <span class="chevron collapsed" id="flexChevron">▾</span></h2>
+        </div>
+        <div id="flexBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table grid-table" id="flexTable">
+              <colgroup id="flexTableCols"></colgroup>
+              <thead><tr id="flexTableHead"></tr></thead>
+              <tbody id="flexTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="vacCard" class="card hidden">
+        <div class="card-header-row card-toggle" id="vacSummaryToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Vacation <span class="chevron collapsed" id="vacSummaryChevron">▾</span></h2>
+        </div>
+        <div id="vacSummaryBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table" id="vacSummaryTable">
+              <tbody id="vacSummaryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- EDITOR VIEW -->
+    <section id="editorView" class="view hidden">
+
+            <div class="wish-list-row">
+        <a href="https://docs.google.com/spreadsheets/d/1nR_B6JsfZ6MIl-L7hv2g91BCxsyiIwEsxjM6EhoGL6s/edit?gid=0#gid=0"
+           target="_blank" rel="noopener noreferrer" class="btn btn-ghost">Wish list ↗</a>
+      </div>
+
+
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Projects</h2>
+          <button id="newProjectBtn" class="btn btn-primary" type="button">+ New project</button>
+        </div>
+
+        <form id="projectForm" class="stacked-form hidden">
+          <input type="hidden" id="projectId" />
+          <div class="field-row" style="flex-wrap:nowrap;gap:16px;align-items:flex-end">
+            <label style="flex:1">Project name
+              <input type="text" id="projectName" required />
+            </label>
+            <label style="flex:0 0 auto">Parent project <span class="optional">optional</span>
+              <select id="projectParent" style="width:200px">
+                <option value="">— Standalone —</option>
+              </select>
+            </label>
+          </div>
+          <div class="field-row" style="flex-wrap:nowrap;gap:16px;align-items:flex-end">
+            <label style="flex:0 0 auto">Project number <span class="optional">optional</span>
+              <input type="text" id="projectCode" maxlength="10" placeholder="e.g. UP-301" style="width:120px" />
+            </label>
+            <label style="flex:0 0 auto">Category <span class="optional">sets badge colour</span>
+              <select id="projectCategory" style="width:155px">
+                <option value="">Other</option>
+                <option value="architecture">Architecture</option>
+                <option value="publicspace">Public Space</option>
+                <option value="urbanplanning">Urban Planning</option>
+              </select>
+            </label>
+            <label style="flex:3;min-width:0">Client <span class="optional">optional</span>
+              <input type="text" id="projectClient" placeholder="Client name" style="width:100%" />
+            </label>
+          </div>
+          <label>Description <span class="optional">optional</span>
+            <input type="text" id="projectDesc" />
+          </label>
+          <div class="field-row" id="projectFeeRow">
+            <label>Expected fee (DKK) <span class="optional">optional</span>
+              <input type="number" min="0" step="1" id="projectExpectedFee" placeholder="0" />
+            </label>
+            <label>Subadvisors (DKK) <span class="optional">optional</span>
+              <input type="number" min="0" step="1" id="projectSubadvisors" placeholder="0" />
+            </label>
+          </div>
+          <p id="projectFeeNote" class="access-intro hidden" style="margin:0">Expected fee and subadvisors are calculated from child projects and cannot be edited here.</p>
+
+          <div class="rate-lines-section">
+            <div class="card-header-row card-toggle" id="rateLineToggle" role="button" tabindex="0" aria-expanded="false" style="margin-bottom:0;padding:6px 0;cursor:pointer">
+              <span class="access-intro" style="margin:0;color:var(--ink-soft)">Project-specific rates <span class="optional">per employee — overrides their standard rate from each "used from" date</span></span>
+              <span class="chevron collapsed" id="rateLineChevron">▾</span>
+            </div>
+            <div id="rateLinesSections" class="hidden" style="margin-top:10px"></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save project</button>
+            <button type="button" id="cancelProjectBtn" class="btn btn-ghost">Cancel</button>
+          </div>
+        </form>
+
+        <div id="accessPanel" class="stacked-form hidden">
+          <p class="access-intro">Who can log hours to <strong id="accessProjectName"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
+          <div id="accessCheckboxes" class="checkbox-list"></div>
+          <div class="form-actions">
+            <button type="button" id="saveAccessBtn" class="btn btn-primary">Save access</button>
+            <button type="button" id="cancelAccessBtn" class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="ledger-table" id="projectsTable">
+            <thead><tr><th>No.</th><th>Project</th><th>Client</th><th>Visible to</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="archivedToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Archived projects <span class="chevron collapsed" id="archivedChevron">▾</span></h2>
+        </div>
+        <div id="archivedBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table" id="archivedTable">
+              <thead><tr><th>No.</th><th>Project</th><th>Client</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="archivedEmpty" class="empty-state hidden">No archived projects.</p>
+        </div>
+      </div>
+
+      <div id="extraTypesContainer"></div>
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="projectTotalsToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Project totals <span class="chevron collapsed" id="projectTotalsChevron">▾</span></h2>
+        </div>
+        <div id="projectTotalsBody" class="collapsible-body hidden">
+          <div class="filters" style="gap:12px;flex-wrap:wrap;align-items:flex-end">
+            <label>Project
+              <select id="totalsProjectSelect"><option value="">Choose a project…</option></select>
+            </label>
+            <label>From <input type="date" id="totalsFrom" /></label>
+            <label>To   <input type="date" id="totalsTo"   /></label>
+            <button class="btn btn-ghost" id="totalsThisYear">This year</button>
+            <button class="btn btn-ghost" id="totalsAllTime">All time</button>
+          </div>
+          <div class="filters" style="gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <span style="font-size:0.78rem;color:var(--ink-soft)">Show:</span>
+            <button class="btn btn-ghost btn-sm" id="toggleTotalsSummary">Summary ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="hours">Hours ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="sales">Sales ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="cost">Cost ✓</button>
+            <button class="btn btn-ghost btn-sm totals-col-toggle active" data-col="margin">Margin ✓</button>
+            <button class="btn btn-ghost" id="exportTotalsCsvBtn" style="margin-left:auto">Export CSV</button>
+            <button class="btn btn-ghost" id="exportTotalsPdfBtn">Export PDF</button>
+          </div>
+          <p id="totalsHint" class="empty-state">Choose a project above to see cost and sales totals per employee.</p>
+          <p id="totalsEmptyState" class="empty-state hidden">No hours logged to this project yet.</p>
+          <div id="projectSummary" class="summary-grid hidden">
+            <div class="summary-item"><span class="summary-label">Expected fee</span><span class="summary-value" id="sumExpectedFee">–</span></div>
+            <div class="summary-item"><span class="summary-label">Subadvisors</span><span class="summary-value" id="sumSubadvisors">–</span></div>
+            <div class="summary-item"><span class="summary-label">Net fee</span><span class="summary-value" id="sumNetFee">–</span></div>
+            <div class="summary-item"><span class="summary-label">Cost price</span><span class="summary-value" id="sumCostPrice">–</span></div>
+            <div class="summary-item"><span class="summary-label">Margin</span><span class="summary-value" id="sumMargin">–</span></div>
+            <div class="summary-item"><span class="summary-label">Factor</span><span class="summary-value" id="sumFactor">–</span></div>
+          </div>
+          <div class="table-wrap">
+            <table class="ledger-table hidden" id="projectTotalsTable">
+              <thead><tr><th>Employee</th><th class="num">Hours</th><th class="num">Sales price</th><th class="num">Cost price</th><th class="num">Margin</th></tr></thead>
+              <tbody></tbody>
+              <tfoot></tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+
+
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="allEntriesToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>All entries <span class="chevron collapsed" id="allEntriesChevron">▾</span></h2>
+          <span class="total-pill">Total: <strong id="allEntriesTotal">0</strong>h</span>
+        </div>
+
+        <div id="allEntriesBody" class="collapsible-body hidden">
+          <div class="filters">
+            <label>Project
+              <select id="filterProject"><option value="">All projects</option></select>
+            </label>
+            <label>Person
+              <select id="filterUser"><option value="">Everyone</option></select>
+            </label>
+            <label>From
+              <input type="date" id="filterFrom" />
+            </label>
+            <label>To
+              <input type="date" id="filterTo" />
+            </label>
+            <button id="exportCsvBtn" class="btn btn-ghost" type="button">Export CSV</button>
+            <button id="exportPdfBtn" class="btn btn-ghost" type="button">Export PDF</button>
+          </div>
+
+          <div id="entryEditPanel" class="edit-entry-panel hidden">
+            <div class="edit-entry-header">
+              <span class="edit-entry-title">Edit entry — <strong id="editEntryPerson"></strong></span>
+              <button type="button" class="link-btn" id="cancelEntryEditBtn">✕ Cancel</button>
+            </div>
+            <form id="entryEditForm" class="edit-entry-form">
+              <input type="hidden" id="editEntryId" />
+              <label>Date
+                <input type="date" id="editEntryDate" required />
+              </label>
+              <label>Project
+                <select id="editEntryProject" required></select>
+              </label>
+              <label>Hours
+                <input type="number" id="editEntryHours" min="0" step="0.25" required />
+              </label>
+              <label>Note
+                <input type="text" id="editEntryNote" placeholder="optional" />
+              </label>
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save changes</button>
+                <button type="button" class="btn btn-ghost" id="cancelEntryEditBtn2">Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="table-wrap">
+            <table class="ledger-table" id="allEntriesTable">
+              <thead><tr><th>Date</th><th>Person</th><th>Project</th><th>Client</th><th class="num">Hours</th><th>Note</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="allEmptyState" class="empty-state hidden">No entries match these filters.</p>
+        </div>
+      </div>
+
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2>Employee Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="vacCalLabel" class="week-label"></span>
+            <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="vacCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
+          </div>
+        </div>
+        <div id="vacationBody" class="collapsible-body">
+          <div id="vacationCalendar"></div>
+        </div>
+      </div>
+
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="ratesToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Employees <span class="chevron collapsed" id="ratesChevron">▾</span></h2>
+        </div>
+        <div id="ratesBody" class="collapsible-body hidden">
+          <p class="access-intro">Sales rate and cost rate are only visible to you here — employees never see these numbers, even their own.</p>
+          <div class="table-wrap">
+            <table class="ledger-table" id="ratesTable">
+              <thead><tr><th>Name</th><th>Type</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="archivedUsersToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Archived employees <span class="chevron collapsed" id="archivedUsersChevron">▾</span></h2>
+        </div>
+        <div id="archivedUsersBody" class="collapsible-body hidden">
+          <p class="access-intro">Archived users can no longer log in. Deleting removes them from Firestore — to fully remove their login account, also delete them from Firebase Console → Security → Authentication.</p>
+          <div class="table-wrap">
+            <table class="ledger-table" id="archivedUsersTable">
+              <thead><tr><th>Employee</th><th>Email</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p id="archivedUsersEmpty" class="empty-state hidden">No archived users.</p>
+        </div>
+      </div>
+
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="absenceCardToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Employee Absence <span class="chevron collapsed" id="absenceCardChevron">▾</span></h2>
+        </div>
+        <div id="absenceCardBody" class="collapsible-body hidden">
+
+          <!-- Summary section -->
+          <h3 class="section-sub-heading">Summary</h3>
+          <div class="filters" style="align-items:flex-end;gap:12px">
+            <label>From <input type="date" id="absFromDate" /></label>
+            <label>To   <input type="date" id="absToDate"   /></label>
+            <button class="btn btn-ghost" id="absThisYear">This year</button>
+            <button class="btn btn-ghost" id="absLastYear">Last year</button>
+            <button class="btn btn-ghost" id="absAllTime">All time</button>
+          </div>
+          <div class="table-wrap" style="margin-top:12px">
+            <table class="ledger-table" id="absenceSummaryTable">
+              <thead><tr id="absenceSummaryHead"></tr></thead>
+              <tbody id="absenceSummaryBody2"></tbody>
+            </table>
+          </div>
+
+          <!-- Holidays & closing days section -->
+          <h3 class="section-sub-heading" style="margin-top:28px">Holidays &amp; Office Closing Days</h3>
+          <div class="filters" style="gap:12px;align-items:flex-end">
+            <label>Year
+              <select id="absCalYear" style="width:100px"></select>
+            </label>
+            <button class="btn btn-ghost" id="absCalAddYear" title="Add next year">+ Year</button>
+          </div>
+          <div id="absCalContent" style="margin-top:12px"></div>
+          <div class="stacked-form" style="margin-top:16px;max-width:200px">
+            <h4 style="margin:0 0 8px;font-size:0.82rem;font-weight:600">Add office closing day</h4>
+            <label>Date
+              <input type="date" id="closingDayDate" style="width:100%;margin-bottom:8px" />
+            </label>
+            <button type="button" id="addClosingDayBtn" class="btn btn-primary" style="width:100%">Add</button>
+            <p id="closingDayError" class="empty-state hidden" style="color:#c0392b;margin-top:4px"></p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+    </section>
+
+  </main>
+  <footer class="app-footer">
+    <span id="appUpdateNotice">–</span>
+  </footer>
+</div>
+
+<div id="stamp" class="stamp hidden">Logged</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<script src="config.js?v=202608012044"></script>
+<script src="app.js?v=202608012044"></script>
+</body>
+</html>

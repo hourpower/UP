@@ -1,0 +1,1155 @@
+/* ==========================================================
+   Tokens
+   ========================================================== */
+:root {
+  --paper: #EDEFEA;
+  --paper-card: #F8F9F6;
+  --ink: #1C2A2E;
+  --ink-soft: #5C6B6A;
+  --line: #C9CFC6;
+  --line-soft: #DEE2DA;
+  --accent: #2F5D5A;
+  --accent-dark: #234543;
+  --accent-soft: #DCE6E0;
+  --stamp: #B5712F;
+  --danger: #A33B2E;
+  --radius: 6px;
+  --font-display: 'MetronicPro', sans-serif;
+  --font-body: 'MetronicPro', sans-serif;
+  --font-mono: 'MetronicPro', sans-serif;
+  --shadow: 0 1px 2px rgba(28,42,46,0.06), 0 4px 14px rgba(28,42,46,0.07);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+h1, h2 { font-family: var(--font-display); font-weight: 600; margin: 0 0 4px; }
+h2 { font-size: 1.15rem; letter-spacing: 0.01em; }
+
+.hidden { display: none !important; }
+
+button { font-family: var(--font-body); cursor: pointer; }
+input, select, textarea {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+
+/* ==========================================================
+   Setup notice
+   ========================================================== */
+.setup-notice {
+  background: var(--stamp);
+  color: #fff;
+  text-align: center;
+  padding: 10px 16px;
+  font-size: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.setup-notice code {
+  background: rgba(255,255,255,0.2);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* ==========================================================
+   Auth screen — ledger paper backdrop
+   ========================================================== */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+}
+
+.ledger-bg {
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 31px,
+    var(--line-soft) 32px
+  );
+  opacity: 0.6;
+}
+
+.auth-card {
+  position: relative;
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 40px 36px 32px;
+  width: 100%;
+  max-width: 380px;
+}
+
+.brand {
+  font-size: 2rem;
+  color: var(--accent-dark);
+}
+.brand-sub {
+  margin: 0 0 24px;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 14px; }
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.auth-form input {
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+}
+
+.form-error {
+  background: #FBEAE6;
+  color: var(--danger);
+  border: 1px solid #E8BDB2;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  margin-bottom: 14px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 0.85rem;
+  margin-top: 16px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 0;
+}
+.link-danger { color: var(--danger); }
+
+.contact-admin {
+  margin-top: 16px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+/* ==========================================================
+   App shell
+   ========================================================== */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--ink);
+  color: #fff;
+  padding: 14px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.brand-mark {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+.brand-logo {
+  height: 34px;
+  width: auto;
+  display: block;
+}
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+.whoami { font-size: 0.85rem; color: #C9D6D2; }
+
+.main {
+  width: 100%;
+  margin: 0;
+  padding: 28px 32px 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.view { display: flex; flex-direction: column; gap: 24px; }
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .grid-two { grid-template-columns: 1fr; }
+}
+
+/* ==========================================================
+   Cards
+   ========================================================== */
+.card {
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px 22px;
+  box-shadow: var(--shadow);
+}
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.total-pill {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.total-pill strong { font-size: 0.95rem; }
+
+/* ==========================================================
+   Forms
+   ========================================================== */
+.stacked-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.stacked-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+.optional { font-weight: 400; color: #93A09E; }
+
+.stacked-form input,
+.stacked-form select,
+.stacked-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .field-row { grid-template-columns: 1fr; }
+}
+
+.proj-code {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
+.ledger-table .num,
+.total-pill,
+.week-label,
+.proj-code,
+.row-total,
+.summary-value,
+.rate-input,
+.grid-table input[type="number"],
+.grid-table tfoot,
+.app-footer {
+  font-weight: 300;
+}
+
+.form-actions { display: flex; gap: 10px; margin-top: 4px; }
+
+.btn {
+  border: none;
+  border-radius: var(--radius);
+  padding: 9px 16px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-block { width: 100%; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+}
+.btn-ghost:hover { background: var(--accent-soft); color: var(--accent-dark); }
+
+/* ==========================================================
+   Ledger tables
+   ========================================================== */
+.table-wrap { overflow-x: auto; }
+
+.ledger-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.ledger-table thead th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--ink);
+  padding: 0 10px 8px;
+}
+.ledger-table tbody td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+.ledger-table tbody tr:last-child td {
+  border-bottom: 2px solid var(--ink);
+}
+.ledger-table .num {
+  font-family: var(--font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+.note-cell { color: var(--ink-soft); max-width: 280px; }
+.row-actions { white-space: nowrap; text-align: right; }
+.row-actions .link-btn { margin: 0 0 0 10px; font-size: 0.8rem; }
+
+.empty-state {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  padding: 18px 4px;
+  text-align: center;
+}
+
+/* status stamp badge used in projects table */
+.stamp-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--stamp);
+  border: 1.5px solid var(--stamp);
+  border-radius: 4px;
+  padding: 2px 7px;
+  transform: rotate(-2deg);
+}
+.stamp-badge-off {
+  color: var(--ink-soft);
+  border-color: var(--line);
+}
+
+/* ==========================================================
+   Filters (editor)
+   ========================================================== */
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed var(--line);
+}
+.filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.76rem;
+  color: var(--ink-soft);
+}
+.filters select, .filters input {
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  font-size: 0.85rem;
+}
+.filters .btn { margin-left: auto; align-self: flex-end; }
+
+/* ==========================================================
+   Stamp toast — the signature confirmation moment
+   ========================================================== */
+.stamp {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px) rotate(-3deg);
+  background: #fff;
+  color: var(--stamp);
+  border: 2.5px solid var(--stamp);
+  border-radius: 8px;
+  padding: 10px 24px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 100;
+  box-shadow: var(--shadow);
+}
+.stamp-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) rotate(-3deg);
+}
+
+/* ==========================================================
+   Weekly grid (user view)
+   ========================================================== */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.week-nav .btn { padding: 6px 11px; }
+.week-label {
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  min-width: 165px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.grid-table th, .grid-table td { text-align: center; }
+.grid-table th:nth-child(2), .grid-table td:nth-child(2) { text-align: left; }
+.grid-table th:nth-child(3), .grid-table td:nth-child(3) { text-align: left; }
+.grid-table thead th.num { text-align: center; }
+.grid-table tfoot td.num { text-align: center; }
+.grid-table tfoot td.right-num { text-align: right; padding-right: 6px; }
+
+.grid-table tfoot td { text-align: center; }
+.foot-num {
+  display: inline-block;
+  width: 54px;
+  text-align: right;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+.grid-table th .day-date {
+  display: block;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.grid-table td.weekend, .grid-table th.weekend { background: #E5E7DF; }
+.grid-table td.weekend input {
+  background: #ECEEE6;
+  border-color: #D2D6C9;
+  color: var(--ink-soft);
+}
+
+.grid-table input[type="number"] {
+  width: 54px;
+  padding: 5px 4px;
+  text-align: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: #fff;
+  color: var(--ink);
+}
+.grid-table input[type="number"]:hover { border-color: var(--accent); }
+
+.grid-table .row-total {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+.grid-table tfoot .totals-row td {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  border-top: 2px solid var(--ink);
+  border-bottom: none;
+  padding-top: 10px;
+}
+
+.grid-hint {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  margin: 12px 2px 0;
+}
+
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sortable-th:hover { color: var(--accent-dark); }
+.sort-active { color: var(--accent-dark); }
+
+.grid-section-header td {
+  background: var(--line-soft);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-soft);
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ==========================================================
+   Access panel (editor — who can log to a project)
+   ========================================================== */
+.access-intro {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin: 0 0 12px;
+}
+.checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+}
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.86rem;
+  padding: 5px 2px;
+}
+.checkbox-row input { accent-color: var(--accent); }
+
+.rate-input {
+  width: 78px;
+  padding: 6px 7px;
+  text-align: right;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: #fff;
+  color: var(--ink);
+}
+.rate-input:hover { border-color: var(--accent); }
+
+.rate-lines-section { margin-top: 4px; }
+.rate-lines-table input[type="date"] {
+  padding: 6px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.83rem;
+  background: #fff;
+  color: var(--ink);
+  width: 142px;
+}
+.rate-lines-table td { padding: 6px 10px; }
+
+/* ==========================================================
+   Project financial summary (Expected fee / Margin / Factor)
+   ========================================================== */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 14px;
+  margin: 4px 0 20px;
+  padding: 14px 16px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+}
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.summary-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+}
+.summary-value {
+  font-family: var(--font-mono);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+
+/* ==========================================================
+   Wish list link
+   ========================================================== */
+.wish-list-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -4px;
+}
+
+/* ==========================================================
+   Collapsible card (All entries)
+   ========================================================== */
+button.card-header-row.card-toggle {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+button.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
+button.card-header-row.card-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+div.card-header-row.card-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
+
+.chevron {
+  display: inline-block;
+  font-size: 0.75em;
+  color: var(--ink-soft);
+  margin-left: 6px;
+  transition: transform 0.15s ease;
+}
+.chevron.collapsed { transform: rotate(-90deg); }
+
+/* ==========================================================
+   Weekly overview status badges
+   ========================================================== */
+.status-ok {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.status-warn {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--stamp);
+  background: #FAF0E4;
+  border: 1.5px solid var(--stamp);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+@media (max-width: 480px) {
+  .auth-card { padding: 30px 22px 26px; }
+  .topbar { padding: 12px 16px; }
+}
+
+/* ==========================================================
+   Inline entry edit panel (editor — All entries)
+   ========================================================== */
+.edit-entry-panel {
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.edit-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.edit-entry-title { font-size: 0.88rem; color: var(--accent-dark); }
+.edit-entry-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+.edit-entry-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--accent-dark);
+  font-weight: 500;
+}
+.edit-entry-form input,
+.edit-entry-form select {
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  font-size: 0.88rem;
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+/* ==========================================================
+   App footer — last update notice
+   ========================================================== */
+.app-footer {
+  text-align: center;
+  padding: 14px 20px;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
+  border-top: 1px solid var(--line-soft);
+  margin-top: 16px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* ==========================================================
+   Per-user rate sections inside project form
+   ========================================================== */
+.user-rate-section {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px dashed var(--line);
+}
+.user-rate-section:last-child { border-bottom: none; margin-bottom: 0; }
+.user-rate-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+  margin: 0 0 8px;
+}
+
+.rate-name-input {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 9px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  background: #fff;
+  color: var(--ink);
+  width: 160px;
+}
+.rate-name-input:hover { border-color: var(--accent); }
+
+.rate-type-select {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-family: var(--font-body);
+  font-size: 0.83rem;
+  background: #fff;
+  color: var(--ink);
+  min-width: 180px;
+}
+.rate-type-select:hover { border-color: var(--accent); }
+
+/* ==========================================================
+   Working week schedule (Permanent position employees)
+   ========================================================== */
+.work-week-row td { padding: 0 0 10px 10px; border-bottom: none; }
+.work-week-section {
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 6px;
+}
+.work-week-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.work-week-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+.btn-sm { padding: 4px 10px; font-size: 0.78rem; }
+.work-week-empty {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  margin: 0;
+}
+.work-week-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.work-week-line:last-child { margin-bottom: 0; }
+.ww-date {
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.83rem;
+  background: #fff;
+  color: var(--ink);
+  width: 142px;
+}
+.ww-hours { width: 72px; }
+.ww-unit {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+/* ==========================================================
+   Flex / Difference / Balance rows (permanent employees)
+   ========================================================== */
+.flex-row td {
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-bottom: none;
+  text-align: center;
+}
+.flex-label {
+  text-align: left !important;
+  color: var(--ink-soft);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+}
+.flex-row.diff td { color: var(--accent-dark); }
+.flex-row.balance td { color: var(--accent-dark); font-weight: 600; }
+.flex-row.balance { border-top: 1px dashed var(--line); }
+.flex-cell { color: var(--ink-soft); }
+.diff-cell { }
+.diff-cell.neg { color: var(--danger); }
+.flex-na { color: var(--line); }
+
+.ww-row-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.ww-total-label {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.ww-total { color: var(--accent-dark); }
+.ww-days-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ww-day-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ww-day-label input { width: 46px; text-align: center; }
+
+.flex-row.top-spaced td { padding-top: 20px; border-top: 2px solid var(--line-soft); margin-top: 8px; }
+.foot-num.neg { color: var(--danger); }
+
+.flex-row.vac td { color: var(--accent-dark); }
+.flex-row.vac .flex-label { color: var(--ink-soft); }
+
+/* Wider inputs in combined rate schedule rows */
+.work-week-line .rate-combo-val { width: 72px; }
+
+/* Bottom-align date with input boxes in rate schedule rows */
+.rate-combo-line { align-items: flex-end; }
+
+/* ==========================================================
+   Absence dropdown row in user grid
+   ========================================================== */
+.absence-select {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  padding: 3px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+  max-width: 100px;
+}
+.absence-select:not(:has(option[value=""]:checked)) {
+  background: #FFF5E0;
+  border-color: var(--stamp);
+  color: var(--stamp);
+}
+.grid-section-header.absence-header td {
+  background: #F0EEE8;
+  color: var(--ink-soft);
+}
+
+/* ==========================================================
+   Vacation calendar (editor)
+   ========================================================== */
+.vac-calendar {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+.vac-calendar th {
+  text-align: center;
+  padding: 6px 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 2px solid var(--ink);
+}
+.vac-calendar td {
+  vertical-align: top;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  min-width: 48px;
+  min-height: 56px;
+}
+.vac-cal-day-num {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.vac-cal-day-num.today { color: var(--accent-dark); }
+.vac-cal-other-month { background: #F5F6F2; }
+.vac-cal-weekend { background: var(--line-soft); }
+.vac-chip {
+  display: inline-block;
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin: 1px 1px;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.vac-chip.ferielov      { background: #B0BEC5; color: #1C313A; }
+.vac-chip.feriefridag   { background: #D7CCC8; color: #3E2723; }
+.vac-chip.afspad        { background: #CFD8DC; color: #263238; }
+.vac-chip.sick          { background: #BDBDBD; color: #212121; }
+
+/* ==========================================================
+   Vacation grid — employees × days
+   ========================================================== */
+.vac-scroll { overflow-x: auto; }
+.vac-grid {
+  border-collapse: collapse;
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+.vac-grid th, .vac-grid td { border: 1px solid var(--line-soft); }
+.vac-name-col { min-width: 130px; }
+.vac-name {
+  text-align: left;
+  padding: 5px 10px;
+  font-weight: 500;
+  background: var(--paper-card);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-right: 2px solid var(--line);
+}
+.vac-col-day {
+  text-align: center;
+  padding: 4px 2px;
+  min-width: 30px;
+  background: var(--paper-card);
+}
+.vac-day-num { font-weight: 600; color: var(--ink-soft); font-size: 0.72rem; }
+.vac-cell { text-align: center; padding: 4px 2px; font-weight: 600; font-size: 0.7rem; }
+.vac-we { background: var(--line-soft) !important; }
+.vac-today-col { background: var(--accent-soft) !important; }
+.vac-col-day.vac-today-col .vac-day-num { color: var(--accent-dark); }
+
+.vac-week-num {
+  text-align: left;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: var(--paper-card);
+  border-bottom: 2px solid var(--ink);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.vac-day-letter {
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.vac-new-month { border-left: 2px solid var(--ink) !important; }
+.vac-month-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  margin-bottom: 1px;
+}
+
+.vac-month-header {
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--paper-card);
+  border-bottom: 1px solid var(--line-soft);
+  letter-spacing: 0.05em;
+}
+
+/* ==========================================================
+   Parent / child project rows in editor table
+   ========================================================== */
+.project-parent-row { background: var(--accent-soft); }
+.project-parent-row td { font-size: 0.88rem; }
+.project-child-row { background: #FAFBFA; }
+.toggle-col { width: 28px; text-align: center; padding: 0 4px; }
+.parent-toggle { font-size: 0.78rem; cursor: pointer; color: var(--accent-dark); }
+
+/* ==========================================================
+   Paused projects
+   ========================================================== */
+.proj-paused { opacity: 0.45; }
+.proj-paused td, .proj-paused th { color: var(--ink-soft); }
+.paused-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  background: var(--line);
+  color: var(--ink-soft);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  vertical-align: middle;
+}
+.proj-status-select {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--ink);
+  margin-right: 8px;
+}
+
+.grid-parent-row { background: var(--accent-soft); }
+.grid-parent-row td { font-weight: 500; }
+.grid-parent-toggle { cursor: pointer; margin-right: 5px; font-size: 0.75rem; color: var(--accent-dark); }
+
+/* Day cells with an absence registered */
+.absence-dimmed { background: #F0EEE8 !important; }
+.absence-dimmed input { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+/* build 202507292305 */
+
+/* Absence dropdown colours by type — grey tones */
+.absence-select { transition: background 0.15s, color 0.15s; }
+.absence-select[data-type="afspad"]       { background: #CFD8DC; color: #263238; border-color: #90A4AE; }
+.absence-select[data-type="ferielov"]     { background: #B0BEC5; color: #1C313A; border-color: #78909C; }
+.absence-select[data-type="feriefridag"]  { background: #D7CCC8; color: #3E2723; border-color: #A1887F; }
+.absence-select[data-type="sick"]         { background: #BDBDBD; color: #212121; border-color: #9E9E9E; }
+
+/* Public holiday cells */
+.holiday-cell { background: #EDEEE9 !important; } /* slightly brighter than weekend #E5E7DF */
+.vac-holiday-col { background: #FFFDE7 !important; }
+.vac-holiday-cell { background: #FFFDE7; }
+.vac-holiday-label { color: var(--ink-soft); font-style: italic; font-weight: 500; }
+.vac-holiday-chip {
+  display: block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #6D4C41;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 56px;
+}
+
+.holiday-name-cell {
+  display: block;
+  font-size: 0.62rem;
+  color: var(--ink-soft);
+  text-align: center;
+  line-height: 1.2;
+  padding: 2px 1px;
+}
+.absence-select[data-type="day_off"]      { background: #E0E0E0; color: #424242; border-color: #BDBDBD; }
+
+.section-sub-heading {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+/* Project Totals table alignment */
+#projectTotalsTable td:first-child,
+#projectTotalsTable th:first-child { text-align: left; }
+#projectTotalsTable td:not(:first-child),
+#projectTotalsTable th:not(:first-child) { text-align: right; }
