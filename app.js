@@ -2323,6 +2323,7 @@ if ($('editorTimesheetEmployee')) {
 function renderEditorTimesheet() {
   const uid = editorTimesheetUid;
   const u   = uid ? allUsersCache.find(x => x.uid === uid) : null;
+  console.log('[EditorTS] uid:', uid, 'user found:', !!u, 'projectsCache:', projectsCache.length, 'allUsersCache:', allUsersCache.length);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(editorTsWeekStart, i));
   const dateStrs  = weekDates.map(toISODate);
   const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
