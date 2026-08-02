@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="fonts.css?v=202608022051" />
-<link rel="stylesheet" href="styles.css?v=202608022051" />
+<link rel="stylesheet" href="fonts.css?v=202608022103" />
+<link rel="stylesheet" href="styles.css?v=202608022103" />
 </head>
 <body>
 
@@ -347,6 +347,43 @@
 
 
       <div class="card">
+        <div class="card-header-row card-toggle" id="editorTimesheetToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Employee Timesheets <span class="chevron collapsed" id="editorTimesheetChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <select id="editorTimesheetEmployee" style="width:180px" class="btn btn-ghost">
+              <option value="">— Select employee —</option>
+            </select>
+            <button id="editorTsPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="editorTsWeekLabel" class="week-label"></span>
+            <button id="editorTsNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="editorTsTodayBtn" class="btn btn-ghost" type="button">This week</button>
+          </div>
+        </div>
+        <div id="editorTimesheetBody" class="collapsible-body hidden">
+          <div class="table-wrap">
+            <table class="ledger-table grid-table" id="editorTsTable">
+              <thead><tr id="editorTsHeadRow"></tr></thead>
+              <tbody id="editorTsBody"></tbody>
+              <tfoot id="editorTsFoot"></tfoot>
+            </table>
+          </div>
+          <p id="editorTsEmpty" class="empty-state hidden">No projects assigned to this employee yet.</p>
+          <div id="editorTsFlexCard" class="hidden" style="margin-top:16px">
+            <h3 class="section-sub-heading">Balance</h3>
+            <table class="ledger-table" id="editorTsFlexTable">
+              <thead><tr id="editorTsFlexHead"></tr></thead>
+              <tbody id="editorTsFlexBody"></tbody>
+            </table>
+          </div>
+          <div id="editorTsVacCard" class="hidden" style="margin-top:16px">
+            <h3 class="section-sub-heading">Vacation</h3>
+            <table class="ledger-table">
+              <tbody id="editorTsVacBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card">
         <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
           <h2>Employee Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
           <div class="week-nav" onclick="event.stopPropagation()">
@@ -457,7 +494,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608022051"></script>
-<script src="app.js?v=202608022051"></script>
+<script src="config.js?v=202608022103"></script>
+<script src="app.js?v=202608022103"></script>
 </body>
 </html>

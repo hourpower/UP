@@ -143,7 +143,8 @@ let projectSortDir = 'desc';
 let collapsedParents = new Set();
 let projectTotalsShowSummary = true;
 let projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
-let userExpandedParents = new Set(); // empty = all parents collapsed by default in user grid
+let editorTimesheetUid = '';
+let editorTsWeekStart  = getMonday(new Date());
 
 function getParentIds() {
   return new Set(projectsCache.filter(p => p.parentId).map(p => p.parentId).filter(Boolean));
@@ -773,13 +774,21 @@ function listenAllUsers() {
     renderRatesTable();
     renderArchivedUsersTable();
     renderVacationCalendar();
+
+    // Populate Employee Timesheets dropdown
+    const tsSel = $('editorTimesheetEmployee');
+    if (tsSel) {
+      const cur = tsSel.value;
+      tsSel.innerHTML = '<option value="">— Select employee —</option>' +
+        allUsersCache.map(u => `<option value="${u.uid}"${u.uid === cur ? ' selected' : ''}>${escapeHtml(u.name)}</option>`).join('');
+      tsSel.value = cur;
+    }
   });
 }
 
 // ============================================================
-// User: weekly hours grid
+// Editor: Employee Timesheets
 // ============================================================
-
 
 function listenOfficeCalendar() {
   db.collection('officeCalendar').onSnapshot(snap => {
@@ -2222,13 +2231,14 @@ function initExtraTypeCards() {
 
   // Register all static editor card toggles once here
   [
-    ['archivedToggle',      'archivedBody',      'archivedChevron'],
-    ['projectTotalsToggle', 'projectTotalsBody', 'projectTotalsChevron'],
-    ['allEntriesToggle',    'allEntriesBody',    'allEntriesChevron'],
-    ['ratesToggle',         'ratesBody',         'ratesChevron'],
-    ['archivedUsersToggle', 'archivedUsersBody', 'archivedUsersChevron'],
-    ['vacationToggle',      'vacationBody',      'vacationChevron'],
-    ['absenceCardToggle',   'absenceCardBody',   'absenceCardChevron'],
+    ['archivedToggle',         'archivedBody',         'archivedChevron'],
+    ['projectTotalsToggle',    'projectTotalsBody',    'projectTotalsChevron'],
+    ['allEntriesToggle',       'allEntriesBody',       'allEntriesChevron'],
+    ['editorTimesheetToggle',  'editorTimesheetBody',  'editorTimesheetChevron'],
+    ['ratesToggle',            'ratesBody',            'ratesChevron'],
+    ['archivedUsersToggle',    'archivedUsersBody',    'archivedUsersChevron'],
+    ['vacationToggle',         'vacationBody',         'vacationChevron'],
+    ['absenceCardToggle',      'absenceCardBody',      'absenceCardChevron'],
   ].forEach(([t, b, c]) => {
     const el = document.getElementById(t);
     if (el && !el.dataset.toggleBound) {
@@ -2263,6 +2273,163 @@ function renderExtraTable(type) {
       </td>
     </tr>`;
   }).join('');
+}
+
+// ============================================================
+// Editor: Employee Timesheets — event wiring
+// ============================================================
+$('editorTimesheetEmployee').addEventListener('change', () => {
+  editorTimesheetUid = $('editorTimesheetEmployee').value;
+  editorTsWeekStart  = getMonday(new Date());
+  renderEditorTimesheet();
+});
+$('editorTsPrevBtn').addEventListener('click',  (e) => { e.stopPropagation(); editorTsWeekStart = addDays(editorTsWeekStart, -7); renderEditorTimesheet(); });
+$('editorTsNextBtn').addEventListener('click',  (e) => { e.stopPropagation(); editorTsWeekStart = addDays(editorTsWeekStart,  7); renderEditorTimesheet(); });
+$('editorTsTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); editorTsWeekStart = getMonday(new Date());          renderEditorTimesheet(); });
+$('editorTimesheetToggle').addEventListener('click', () => {
+  if ($('editorTimesheetToggle').getAttribute('aria-expanded') === 'true') renderEditorTimesheet();
+});
+
+$('editorTsBody').addEventListener('change', async (e) => {
+  const input = e.target;
+  if (!input.matches('input[data-project]')) return;
+  const projectId = input.dataset.project;
+  const date      = input.dataset.date;
+  const uid       = input.dataset.uid;
+  const raw       = parseFloat(input.value);
+  const hours     = isNaN(raw) || raw <= 0 ? 0 : raw;
+  const u         = allUsersCache.find(x => x.uid === uid);
+  const existing  = allEntriesCache.find(en => en.userId === uid && en.projectId === projectId && en.date === date);
+  if (hours === 0) {
+    if (existing) { await db.collection('entries').doc(existing.id).delete(); input.value = ''; }
+    return;
+  }
+  const p = projectById(projectId);
+  const payload = { userId: uid, userName: u?.name || '', projectId, projectName: p?.name || '', date, hours, note: existing?.note || '' };
+  if (existing) {
+    await db.collection('entries').doc(existing.id).update(payload);
+  } else {
+    await db.collection('entries').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  }
+  showStamp('Saved');
+});
+
+function renderEditorTimesheet() {
+  const uid = editorTimesheetUid;
+  const u   = uid ? allUsersCache.find(x => x.uid === uid) : null;
+  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(editorTsWeekStart, i));
+  const dateStrs  = weekDates.map(toISODate);
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  $('editorTsWeekLabel').textContent = weekRangeLabel(editorTsWeekStart);
+  $('editorTsHeadRow').innerHTML = '<th class="toggle-col"></th><th>No.</th><th>Project</th>' +
+    weekDates.map((d,i)=>`<th class="num${i>=5?' weekend':''}">${DAYS[i]}<span class="day-date">${d.getDate()}/${d.getMonth()+1}</span></th>`).join('') +
+    '<th class="num">Total<span class="day-date">week</span></th><th class="num">Total<span class="day-date">YTD</span></th>';
+
+  if (!u) {
+    $('editorTsBody').innerHTML=''; $('editorTsFoot').innerHTML='';
+    $('editorTsEmpty').classList.remove('hidden');
+    $('editorTsFlexCard').classList.add('hidden'); $('editorTsVacCard').classList.add('hidden');
+    return;
+  }
+  $('editorTsEmpty').classList.add('hidden');
+
+  const parentIds   = getParentIds();
+  const yearStart   = `${editorTsWeekStart.getFullYear()}-01-01`;
+  const weekEndStr  = toISODate(addDays(editorTsWeekStart, 6));
+  const userEntries = allEntriesCache.filter(en => en.userId === uid);
+  const entryFor    = (pid, ds) => userEntries.find(en => en.projectId === pid && en.date === ds);
+  const ytdFor      = (pid) => userEntries.filter(en => en.projectId === pid && en.date >= yearStart && en.date <= weekEndStr).reduce((s,en) => s + en.hours, 0);
+  const holidays    = getActiveHolidaysForDates(dateStrs);
+  const absenceByDate = {};
+  allAbsencesCache.filter(a => a.userId === uid).forEach(a => { absenceByDate[a.date] = a.type; });
+  const isVisible   = (p) => !p.assignedUserIds?.length || p.assignedUserIds.includes(uid);
+  const activeProjs = projectsCache.filter(p => p.active !== false && isVisible(p));
+  const childrenMap = {};
+  activeProjs.filter(p => p.parentId).forEach(p => { if (!childrenMap[p.parentId]) childrenMap[p.parentId]=[]; childrenMap[p.parentId].push(p); });
+  const topLevel    = sortItems(activeProjs.filter(p => !p.parentId));
+  const extras      = EXTRA_TYPES.map(({type,label}) => ({ label, items: sortItems((extraCache[type]||[]).filter(p => p.active!==false && isVisible(p))) }));
+  const hasItems    = topLevel.length > 0 || extras.some(g => g.items.length > 0);
+  $('editorTsTable').classList.toggle('hidden', !hasItems);
+  const colspan = 12;
+
+  const renderRow = (p) => {
+    let rowTotal = 0;
+    const cells = dateStrs.map((ds,i) => {
+      if (holidays[ds] || absenceByDate[ds]) return `<td class="holiday-cell${i>=5?' weekend':''}"></td>`;
+      const en = entryFor(p.id, ds); rowTotal += en ? en.hours : 0;
+      return `<td class="${i>=5?'weekend':''}"><input type="number" min="0" step="0.25" inputmode="decimal"
+        data-project="${p.id}" data-date="${ds}" data-uid="${uid}" value="${en ? en.hours : ''}" /></td>`;
+    }).join('');
+    return `<tr><td class="toggle-col"></td><td class="num-col">${projectCodeBadgeHtml(p)}</td><td>${escapeHtml(p.name)}</td>
+      ${cells}<td class="num row-total">${trimZeros(rowTotal)}</td><td class="num row-total">${trimZeros(ytdFor(p.id))}</td></tr>`;
+  };
+
+  let bodyHtml = `<tr class="grid-section-header"><td colspan="${colspan}">Projects</td></tr>`;
+  topLevel.forEach(p => {
+    if (parentIds.has(p.id)) {
+      const children = (childrenMap[p.id]||[]).sort((a,b)=>(a.code||a.name).localeCompare(b.code||b.name));
+      const dayTots  = dateStrs.map(ds => children.reduce((s,c)=>{ const en=entryFor(c.id,ds); return s+(en?en.hours:0); },0));
+      const dayCells = dayTots.map((t,i)=>`<td class="${i>=5?'weekend':''}" style="text-align:center;color:var(--ink-soft);font-size:0.82rem">${t>0?trimZeros(t):''}</td>`).join('');
+      bodyHtml += `<tr class="grid-parent-row"><td class="toggle-col"><span class="grid-parent-toggle" onclick="toggleEditorParent('${p.id}')">${collapsedParents.has(p.id)?'▶':'▼'}</span></td>
+        <td class="num-col">${projectCodeBadgeHtml(p)}</td><td>${escapeHtml(p.name)} <span class="optional">(${children.length})</span></td>
+        ${dayCells}<td class="num row-total">${trimZeros(dayTots.reduce((s,n)=>s+n,0))}</td><td class="num row-total">${trimZeros(children.reduce((s,c)=>s+ytdFor(c.id),0))}</td></tr>`;
+      if (!collapsedParents.has(p.id)) children.forEach(c => { bodyHtml += renderRow(c); });
+    } else {
+      bodyHtml += renderRow(p);
+    }
+  });
+  extras.forEach(({label,items}) => {
+    if (!items.length) return;
+    bodyHtml += `<tr class="grid-section-header"><td colspan="${colspan}">${label}</td></tr>`;
+    items.forEach(p => { bodyHtml += renderRow(p); });
+  });
+  $('editorTsBody').innerHTML = bodyHtml;
+
+  const allLoggable = [...topLevel.filter(p=>!parentIds.has(p.id)), ...Object.values(childrenMap).flat(), ...extras.flatMap(g=>g.items)];
+  const dayTotals = dateStrs.map(ds => allLoggable.reduce((s,p)=>{ const en=entryFor(p.id,ds); return s+(en?en.hours:0); },0));
+  $('editorTsFoot').innerHTML = `<tr class="totals-row"><td class="toggle-col"></td><td colspan="2">Total</td>` +
+    dayTotals.map((t,i)=>`<td class="${i>=5?'weekend':''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
+    `<td><span class="foot-num">${trimZeros(dayTotals.reduce((s,n)=>s+n,0))}</span></td><td><span class="foot-num">${trimZeros(allLoggable.reduce((s,p)=>s+ytdFor(p.id),0))}</span></td></tr>`;
+
+  const isPerm = u.employeeType === '2';
+  $('editorTsFlexCard').classList.toggle('hidden', !isPerm);
+  $('editorTsVacCard').classList.toggle('hidden', !isPerm);
+  if (isPerm && (u.workWeekSchedule||[]).length) {
+    const schedule = u.workWeekSchedule;
+    const weekEnd  = addDays(editorTsWeekStart, 6);
+    const fmt      = (v, sign=false) => v===null ? '<span class="flex-na">–</span>' : (sign&&v>0?'+':sign&&v<0?'−':'')+trimZeros(Math.abs(v));
+    let balance = computeBalance(toISODate(addDays(editorTsWeekStart,-1)), schedule, userEntries) || 0;
+    const today = toISODate(new Date());
+    const DAY_LABELS = weekDates.map((d,i)=>`${DAYS[i]} ${d.getDate()}/${d.getMonth()+1}`);
+    $('editorTsFlexHead').innerHTML = `<th style="min-width:120px"></th>` + DAY_LABELS.map((l,i)=>`<th class="num${i>=5?' weekend':''}">${l}</th>`).join('') + `<th class="num">Total week</th>`;
+    let fwt=0,dwt=0;
+    const fv=[],dv=[],bv=[];
+    for (let i=0;i<7;i++){
+      const ds=dateStrs[i], flex=getFlexHours(ds,schedule);
+      const absType=absenceByDate[ds], holiday=holidays[ds];
+      let eff=absType?(absType==='afspad'?0:(flex||0)):holiday?(flex||0):dayTotals[i];
+      const diff=flex!==null?eff-flex:null;
+      if(diff!==null){balance+=diff;fwt+=flex;dwt+=diff;}
+      fv.push(fmt(flex)); dv.push(fmt(diff,true)); bv.push(flex!==null&&ds<=today?fmt(balance,true):'–');
+    }
+    $('editorTsFlexBody').innerHTML = [{label:'Flex',vals:fv,tot:fmt(fwt)},{label:'Difference',vals:dv,tot:fmt(dwt,true)},{label:'Balance',vals:bv,tot:''}]
+      .map(r=>`<tr><td class="flex-label">${r.label}</td>${r.vals.map((v,i)=>`<td style="text-align:right;padding-right:6px" class="${i>=5?'weekend':''}">${v}</td>`).join('')}<td style="text-align:right;padding-right:8px">${r.tot}</td></tr>`).join('');
+    const rData=ratesCache[uid]||{}, vacSched=rData.vacSchedule||[];
+    const vac=calcVacation(schedule,weekEnd,vacSched,'vacationRate',2.08);
+    const ferie=calcVacation(schedule,weekEnd,vacSched,'feriefridageRate',0.5);
+    const fmtD=d=>`${trimZeros(Math.round(d*100)/100)} d`;
+    const uAbs=allAbsencesCache.filter(a=>a.userId===uid);
+    const ys=`${weekEnd.getFullYear()}-01-01`;
+    const flU=uAbs.filter(a=>a.type==='ferielov'&&a.date>=ys&&a.date<=weekEndStr).length;
+    const fdU=uAbs.filter(a=>a.type==='feriefridag'&&a.date>=ys&&a.date<=weekEndStr).length;
+    const clU=Object.values(officeCalendarCache).flatMap(y=>y.closingDays||[]).filter(c=>c.date>=ys&&c.date<=weekEndStr).length;
+    const fmtBal=(e,u)=>`${fmtD(e)} − ${fmtD(u)} = <strong>${fmtD(Math.round((e-u)*100)/100)}</strong>`;
+    $('editorTsVacBody').innerHTML=`
+      <tr><td class="flex-label" style="font-weight:700">Vacation rate</td><td class="num">${fmtD(vac.rate)}/mo</td></tr>
+      <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd,flU+clU)}</td></tr>
+      <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Feriefriday rate</td><td class="num">${fmtD(ferie.rate)}/mo</td></tr>
+      <tr><td class="flex-label">Feriefriday YTD</td><td class="num">${fmtBal(ferie.ytd,fdU)}</td></tr>`;
+  }
 }
 
 // ============================================================
