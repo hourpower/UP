@@ -149,6 +149,7 @@ let projectTotalsShowSummary = true;
 let projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
 let editorTimesheetUid = '';
 let editorTsWeekStart  = getMonday(new Date());
+let userExpandedParents = new Set();
 
 function getParentIds() {
   return new Set(projectsCache.filter(p => p.parentId).map(p => p.parentId).filter(Boolean));
