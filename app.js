@@ -2278,41 +2278,42 @@ function renderExtraTable(type) {
 // ============================================================
 // Editor: Employee Timesheets — event wiring
 // ============================================================
-$('editorTimesheetEmployee').addEventListener('change', () => {
-  editorTimesheetUid = $('editorTimesheetEmployee').value;
-  editorTsWeekStart  = getMonday(new Date());
-  renderEditorTimesheet();
-});
-$('editorTsPrevBtn').addEventListener('click',  (e) => { e.stopPropagation(); editorTsWeekStart = addDays(editorTsWeekStart, -7); renderEditorTimesheet(); });
-$('editorTsNextBtn').addEventListener('click',  (e) => { e.stopPropagation(); editorTsWeekStart = addDays(editorTsWeekStart,  7); renderEditorTimesheet(); });
-$('editorTsTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); editorTsWeekStart = getMonday(new Date());          renderEditorTimesheet(); });
-$('editorTimesheetToggle').addEventListener('click', () => {
-  if ($('editorTimesheetToggle').getAttribute('aria-expanded') === 'true') renderEditorTimesheet();
-});
-
-$('editorTsBody').addEventListener('change', async (e) => {
-  const input = e.target;
-  if (!input.matches('input[data-project]')) return;
-  const projectId = input.dataset.project;
-  const date      = input.dataset.date;
-  const uid       = input.dataset.uid;
-  const raw       = parseFloat(input.value);
-  const hours     = isNaN(raw) || raw <= 0 ? 0 : raw;
-  const u         = allUsersCache.find(x => x.uid === uid);
-  const existing  = allEntriesCache.find(en => en.userId === uid && en.projectId === projectId && en.date === date);
-  if (hours === 0) {
-    if (existing) { await db.collection('entries').doc(existing.id).delete(); input.value = ''; }
-    return;
-  }
-  const p = projectById(projectId);
-  const payload = { userId: uid, userName: u?.name || '', projectId, projectName: p?.name || '', date, hours, note: existing?.note || '' };
-  if (existing) {
-    await db.collection('entries').doc(existing.id).update(payload);
-  } else {
-    await db.collection('entries').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
-  }
-  showStamp('Saved');
-});
+if ($('editorTimesheetEmployee')) {
+  $('editorTimesheetEmployee').addEventListener('change', () => {
+    editorTimesheetUid = $('editorTimesheetEmployee').value;
+    editorTsWeekStart  = getMonday(new Date());
+    renderEditorTimesheet();
+  });
+  $('editorTsPrevBtn').addEventListener('click',  (e) => { e.stopPropagation(); editorTsWeekStart = addDays(editorTsWeekStart, -7); renderEditorTimesheet(); });
+  $('editorTsNextBtn').addEventListener('click',  (e) => { e.stopPropagation(); editorTsWeekStart = addDays(editorTsWeekStart,  7); renderEditorTimesheet(); });
+  $('editorTsTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); editorTsWeekStart = getMonday(new Date());          renderEditorTimesheet(); });
+  $('editorTimesheetToggle').addEventListener('click', () => {
+    if ($('editorTimesheetToggle').getAttribute('aria-expanded') === 'true') renderEditorTimesheet();
+  });
+  $('editorTsBody').addEventListener('change', async (e) => {
+    const input = e.target;
+    if (!input.matches('input[data-project]')) return;
+    const projectId = input.dataset.project;
+    const date      = input.dataset.date;
+    const uid       = input.dataset.uid;
+    const raw       = parseFloat(input.value);
+    const hours     = isNaN(raw) || raw <= 0 ? 0 : raw;
+    const u         = allUsersCache.find(x => x.uid === uid);
+    const existing  = allEntriesCache.find(en => en.userId === uid && en.projectId === projectId && en.date === date);
+    if (hours === 0) {
+      if (existing) { await db.collection('entries').doc(existing.id).delete(); input.value = ''; }
+      return;
+    }
+    const p = projectById(projectId);
+    const payload = { userId: uid, userName: u?.name || '', projectId, projectName: p?.name || '', date, hours, note: existing?.note || '' };
+    if (existing) {
+      await db.collection('entries').doc(existing.id).update(payload);
+    } else {
+      await db.collection('entries').add({ ...payload, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+    }
+    showStamp('Saved');
+  });
+}
 
 function renderEditorTimesheet() {
   const uid = editorTimesheetUid;
@@ -2465,7 +2466,6 @@ function listenUserEntries() {
 
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
-  try {
 
   $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}`;
   $('weekLabel').textContent = weekRangeLabel(weekStart);
@@ -2747,9 +2747,6 @@ function renderWeekGrid() {
     `<td><span class="foot-num">${trimZeros(grandTotalYTD)}</span></td></tr>`;
 
   // Flex / Difference / Balance rows — permanent position employees only
-  } catch (err) {
-    console.error('[renderWeekGrid crash]', err);
-  }
 }
 
 $('weekGridBody').addEventListener('click', (e) => {
