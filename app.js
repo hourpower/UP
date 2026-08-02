@@ -1,5 +1,9 @@
 // ============================================================
 // Hour Power — app.js — build 202507292300
+window.addEventListener('error', (e) => {
+  console.error('[Global error]', e.message, 'at', e.filename, e.lineno);
+});
+
 console.log('Hour Power app.js loaded — build 202507292300');
 // You shouldn't need to edit this file. Project/account
 // settings live in config.js.
@@ -2466,6 +2470,7 @@ function listenUserEntries() {
 
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
+  console.log('[renderWeekGrid] projectsCache:', projectsCache.length, 'currentUser:', currentUser?.uid);
 
   $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}`;
   $('weekLabel').textContent = weekRangeLabel(weekStart);
