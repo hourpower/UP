@@ -2354,7 +2354,7 @@ function renderEditorTimesheet() {
   const childrenMap = {};
   activeProjs.filter(p => p.parentId).forEach(p => { if (!childrenMap[p.parentId]) childrenMap[p.parentId]=[]; childrenMap[p.parentId].push(p); });
   const topLevel    = sortItems(activeProjs.filter(p => !p.parentId));
-  const extras      = EXTRA_TYPES.map(({type,label}) => ({ label, items: sortItems((extraCache[type]||[]).filter(p => p.active!==false && isVisible(p))) }));
+  const extras      = EXTRA_TYPES.map(({type,label}) => ({ label, items: sortUserProjects((extraCache[type]||[]).filter(p => p.active!==false && isVisible(p))) }));
   const hasItems    = topLevel.length > 0 || extras.some(g => g.items.length > 0);
   $('editorTsTable').classList.toggle('hidden', !hasItems);
   const colspan = 12;
@@ -2470,6 +2470,16 @@ function listenUserEntries() {
     });
 }
 
+// Sort projects: by code descending, then by name
+function sortItems(items) {
+  return [...items].sort((a, b) => {
+    if (a.code && b.code) return b.code.localeCompare(a.code, undefined, { numeric: true });
+    if (a.code) return -1;
+    if (b.code) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
   console.log('[renderWeekGrid] projectsCache:', projectsCache.length, 'currentUser:', currentUser?.uid);
@@ -2489,7 +2499,7 @@ function renderWeekGrid() {
     '<th class="num">Total<span class="day-date">week</span></th>' +
     '<th class="num">Total<span class="day-date">YTD</span></th>';
 
-  const sortItems = (items) => [...items].sort((a, b) => {
+  const sortUserProjects = (items) => [...items].sort((a, b) => {
     const va = (a[userSortKey] || '').toLowerCase();
     const vb = (b[userSortKey] || '').toLowerCase();
     const cmp = va.localeCompare(vb);
@@ -2506,11 +2516,11 @@ function renderWeekGrid() {
     if (!childrenByParentUser[p.parentId]) childrenByParentUser[p.parentId] = [];
     childrenByParentUser[p.parentId].push(p);
   });
-  const topLevelProjects = sortItems(activeProjects.filter(p => !p.parentId));
+  const topLevelProjects = sortUserProjects(activeProjects.filter(p => !p.parentId));
 
   const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
     label,
-    items: sortItems((extraCache[type] || []).filter(p =>
+    items: sortUserProjects((extraCache[type] || []).filter(p =>
       p.active !== false && isProjectVisibleToCurrentUser(p)
     ))
   }));
@@ -2852,7 +2862,7 @@ function listenAllEntriesForEditor() {
     renderFilterUserSelect();
     renderAllEntries();
     renderProjectTotals();
-    renderWeekOverview();
+    if ($('editorTimesheetToggle')?.getAttribute('aria-expanded') === 'true') renderEditorTimesheet();
   });
 }
 
