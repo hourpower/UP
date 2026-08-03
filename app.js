@@ -27,6 +27,10 @@ console.log('Hour Power app.js loaded — build 202507292300');
   } catch { /* silently ignore if fetch fails */ }
 })();
 
+// Lock icons used in submit/unlock UI
+const SVG_LOCK_CLOSED = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16" fill="none" style="vertical-align:-3px;margin-right:5px"><rect x="1" y="7" width="12" height="9" rx="2" fill="#E53935"/><path d="M3.5 7V5C3.5 2.79 5.07 1 7 1C8.93 1 10.5 2.79 10.5 5V7" stroke="#E53935" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="7" cy="11.5" r="1.4" fill="white"/><rect x="6.35" y="11.5" width="1.3" height="2.5" rx="0.65" fill="white"/></svg>`;
+const SVG_LOCK_OPEN   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16" fill="none" style="vertical-align:-3px;margin-right:5px"><rect x="1" y="7" width="12" height="9" rx="2" fill="#43A047"/><path d="M3.5 7V5C3.5 2.79 5.07 1 7 1C8.93 1 10.5 2.79 10.5 5" stroke="#43A047" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="7" cy="11.5" r="1.4" fill="white"/><rect x="6.35" y="11.5" width="1.3" height="2.5" rx="0.65" fill="white"/></svg>`;
+
 const $ = (id) => document.getElementById(id);
 
 // ---- Setup check -------------------------------------------------
@@ -816,7 +820,7 @@ function renderSubmittedTimesheets() {
         <td>${weekLabel}</td>
         <td>${submitted}</td>
         <td class="row-actions">
-          <button class="link-btn" onclick="unlockWeek('${l.id}', '${escapeHtml(l.userName || '')}', '${weekLabel}')">🔓 Unlock</button>
+          <button class="link-btn" onclick="unlockWeek('${l.id}', '${escapeHtml(l.userName || '')}', '${weekLabel}')">${SVG_LOCK_OPEN}Unlock</button>
         </td>
       </tr>`;
     }).join('')}</tbody>
@@ -2546,7 +2550,7 @@ function renderWeekGrid() {
   const locked = isWeekLocked(currentUser.uid, weekStart);
   const submitBtn = $('weekSubmitBtn');
   if (submitBtn) {
-    submitBtn.textContent = locked ? '🔒 Submitted' : '🔓 Submit';
+    submitBtn.innerHTML = locked ? `${SVG_LOCK_CLOSED}Submitted` : `${SVG_LOCK_OPEN}Submit week`;
     submitBtn.title = locked ? 'This week is submitted — only an editor can unlock it' : 'Submit this week\'s hours';
     submitBtn.disabled = locked;
     submitBtn.style.opacity = locked ? '0.7' : '';
