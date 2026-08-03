@@ -172,7 +172,12 @@ let vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 
 let calViewMode = 'daily';
 
 function packIntervals(ivs) {
-  const sorted = [...ivs].sort((a, b) => a.s - b.s);
+  // Sort: by start position first, then Projects before AQ, then most hours on top
+  const sorted = [...ivs].sort((a, b) => {
+    if (a.s !== b.s) return a.s - b.s;
+    if ((a.priority||0) !== (b.priority||0)) return (a.priority||0) - (b.priority||0);
+    return (b.totalHours||0) - (a.totalHours||0);
+  });
   const layers = [];
   for (const iv of sorted) {
     let placed = false;
@@ -976,8 +981,16 @@ function renderVacationCalendar() {
     return ivs.map(iv => {
       const proj = findProjectAnywhere(iv.pid);
       if (!proj) return null;
+      if (proj._extraType === 'adm') return null; // hide ADM from calendar
+      const priority = proj._extraType ? 1 : 0; // Projects (0) before AQ (1)
+      // compute total hours for this interval span
+      const totalHours = Array.from({length: iv.e - iv.s + 1}, (_, k) => {
+        const col = cols[iv.s + k];
+        const dates = dateFn ? dateFn(col) : [col.ds];
+        return dates.reduce((s, ds) => s + (hoursLookup[uid]?.[ds]?.[iv.pid]||0), 0);
+      }).reduce((a,b)=>a+b,0);
       const c = proj._extraType ? (EXTRA_TYPE_COLORS[proj._extraType]||{bg:'#B0BEC5',text:'#263238'}) : { bg: getProjectBadgeColor(proj)||'#78909C', text:'#fff' };
-      return { s:iv.s, e:iv.e, name:proj.name, bg:c.bg, text:c.text };
+      return { s:iv.s, e:iv.e, name:proj.name, bg:c.bg, text:c.text, priority, totalHours };
     }).filter(Boolean);
   };
 
@@ -1068,6 +1081,16 @@ function renderVacationCalendar() {
     });
     const monthRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
       months.map(m=>`<th colspan="${m.count}" class="vac-month-header">${new Date(m.y,m.m).toLocaleString('en',{month:'long'}).toUpperCase()} ${m.y}</th>`).join('') + '</tr>';
+    // Week number row
+    const weekGroups2 = [];
+    days.forEach((d) => {
+      const wn = isoWeekNumber(new Date(d.ds + 'T00:00:00'));
+      if (!weekGroups2.length || weekGroups2[weekGroups2.length-1].wn !== wn)
+        weekGroups2.push({ wn, count: 1 });
+      else weekGroups2[weekGroups2.length-1].count++;
+    });
+    const weekRow2 = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      weekGroups2.map(w=>`<th colspan="${w.count}" class="vac-week-num-row">W${w.wn}</th>`).join('') + '</tr>';
     const dayRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
       days.map(d=>`<th class="vac-col-day${d.isWE?' cal-we':''}${d.isToday?' cal-today':''}">${d.d}</th>`).join('') + '</tr>';
 
@@ -1078,7 +1101,7 @@ function renderVacationCalendar() {
     }).join('');
 
     container.innerHTML = `<div class="vac-scroll"><table class="vac-grid">
-      <thead>${monthRow}${dayRow}</thead><tbody>${bodyRows}</tbody>
+      <thead>${monthRow}${weekRow2}${dayRow}</thead><tbody>${bodyRows}</tbody>
     </table></div>`;
 
   } else if (calViewMode === 'weekly') {

@@ -1180,3 +1180,4 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .vac-grid thead .cal-head-row .cal-we { color:rgba(255,255,255,0.35) !important; }
 .vac-grid thead .vac-month-header { background:#222e42; color:rgba(255,255,255,0.9); font-size:0.7rem; text-align:left; padding-left:6px; }
 .gantt-bar-cell { padding:1px 3px !important; vertical-align:middle; }
+.vac-week-num-row { background:#2a3a52 !important; color:rgba(255,255,255,0.6) !important; font-size:0.64rem; font-weight:500; text-align:left; padding-left:4px; border-left:1px solid rgba(255,255,255,0.15) !important; }
