@@ -1167,3 +1167,16 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 #projectTotalsTable td:nth-child(4) { width: 150px; }
 #projectTotalsTable th:nth-child(5),
 #projectTotalsTable td:nth-child(5) { width: 150px; }
+
+/* ===== Employee Calendar — Gantt redesign ===== */
+.cal-mode-btns { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+.cal-mode-btn { background:transparent; border:none; padding:5px 12px; font-size:0.8rem; font-family:var(--font-body); cursor:pointer; color:var(--ink-soft); transition:background 0.12s,color 0.12s; }
+.cal-mode-btn.active { background:var(--ink); color:#fff; }
+.cal-mode-btn:hover:not(.active) { background:var(--line-soft); }
+
+.vac-grid thead .cal-head-row th { background:#1a2332; color:rgba(255,255,255,0.75); font-size:0.68rem; font-weight:600; letter-spacing:0.04em; padding:4px 3px; text-align:center; border-color:rgba(255,255,255,0.08); }
+.vac-grid thead .cal-head-row .vac-name-col { background:#1a2332; }
+.vac-grid thead .cal-head-row .cal-today { background:#2E5B38 !important; color:#fff !important; }
+.vac-grid thead .cal-head-row .cal-we { color:rgba(255,255,255,0.35) !important; }
+.vac-grid thead .vac-month-header { background:#222e42; color:rgba(255,255,255,0.9); font-size:0.7rem; text-align:left; padding-left:6px; }
+.gantt-bar-cell { padding:1px 3px !important; vertical-align:middle; }

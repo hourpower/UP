@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="fonts.css?v=202608031537" />
-<link rel="stylesheet" href="styles.css?v=202608031537" />
+<link rel="stylesheet" href="fonts.css?v=202608032009" />
+<link rel="stylesheet" href="styles.css?v=202608032009" />
 </head>
 <body>
 
@@ -361,6 +361,11 @@
         <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
           <h2>Employee Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
           <div class="week-nav" onclick="event.stopPropagation()">
+            <div class="cal-mode-btns">
+              <button class="cal-mode-btn active" id="calModeDaily">Daily</button>
+              <button class="cal-mode-btn" id="calModeWeekly">Weekly</button>
+              <button class="cal-mode-btn" id="calModeMonthly">Monthly</button>
+            </div>
             <button id="vacCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
             <span id="vacCalLabel" class="week-label"></span>
             <button id="vacCalNextBtn" class="btn btn-ghost" type="button">›</button>
@@ -476,7 +481,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608031537"></script>
-<script src="app.js?v=202608031537"></script>
+<script src="config.js?v=202608032009"></script>
+<script src="app.js?v=202608032009"></script>
 </body>
 </html>

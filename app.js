@@ -169,6 +169,20 @@ function computeParentFees(parentId) {
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 let vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calViewMode = 'daily';
+
+function packIntervals(ivs) {
+  const sorted = [...ivs].sort((a, b) => a.s - b.s);
+  const layers = [];
+  for (const iv of sorted) {
+    let placed = false;
+    for (const layer of layers) {
+      if (layer[layer.length - 1].e < iv.s) { layer.push(iv); placed = true; break; }
+    }
+    if (!placed) layers.push([iv]);
+  }
+  return layers;
+}
 let userSortKey = 'code';
 let userSortDir = 'desc';
 
@@ -883,6 +897,16 @@ $('vacCalPrevBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCa
 $('vacCalNextBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(vacCalendarDate.getFullYear(), vacCalendarDate.getMonth() + 1, 1); renderVacationCalendar(); });
 $('vacCalTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderVacationCalendar(); });
 
+['calModeDaily','calModeWeekly','calModeMonthly'].forEach(id => {
+  $(id).addEventListener('click', (e) => {
+    e.stopPropagation();
+    calViewMode = { calModeDaily:'daily', calModeWeekly:'weekly', calModeMonthly:'monthly' }[id];
+    document.querySelectorAll('.cal-mode-btn').forEach(b => b.classList.remove('active'));
+    $(id).classList.add('active');
+    renderVacationCalendar();
+  });
+});
+
 // Re-render calendar whenever the card is expanded
 $('vacationToggle').addEventListener('click', () => {
   if ($('vacationToggle').getAttribute('aria-expanded') === 'true') renderVacationCalendar();
@@ -905,164 +929,230 @@ function findProjectAnywhere(id) {
 
 function renderVacationCalendar() {
   const label = $('vacCalLabel');
-  if (label) label.textContent = vacCalendarDate.toLocaleString('en', { month: 'long', year: 'numeric' });
   const container = $('vacationCalendar');
   if (!container) return;
 
-  const year  = vacCalendarDate.getFullYear();
-  const month = vacCalendarDate.getMonth();
   const today = toISODate(new Date());
-
-  const DAY_LETTERS = ['S','M','T','W','T','F','S']; // Sun=0 … Sat=6
-
-  // Build 2 full months of days starting from the 1st of the chosen month
-  const totalDays = new Date(year, month + 1, 0).getDate()
-                  + new Date(year, month + 2, 0).getDate();
-
-  // Build day metadata
-  const days = Array.from({ length: totalDays }, (_, i) => {
-    const d   = new Date(year, month, i + 1);
-    const ds  = toISODate(d);
-    const dow = d.getDay();
-    const isNewMonth = d.getDate() === 1 && i > 0;
-    return {
-      num: d.getDate(), ds, dow, isWE: dow === 0 || dow === 6,
-      isToday: ds === today, letter: DAY_LETTERS[dow],
-      weekNum: isoWeekNumber(d),
-      isNewMonth, monthLabel: isNewMonth ? d.toLocaleString('en', { month: 'long', year: 'numeric' }) : null
-    };
-  });
-
-  // Group days by ISO week for the header
-  const weekGroups = [];
-  days.forEach(d => {
-    const last = weekGroups[weekGroups.length - 1];
-    if (!last || last.week !== d.weekNum) weekGroups.push({ week: d.weekNum, count: 1 });
-    else last.count++;
-  });
-
-  // Group days by month for the top header row
-  const monthGroups = [];
-  days.forEach(d => {
-    const dd = new Date(d.ds);
-    const key = `${dd.getFullYear()}-${dd.getMonth()}`;
-    const last = monthGroups[monthGroups.length - 1];
-    if (!last || last.key !== key) {
-      monthGroups.push({ key, label: dd.toLocaleString('en', { month: 'long', year: 'numeric' }), count: 1 });
-    } else last.count++;
-  });
-
-  // Absence lookup: { uid: { date: type } }
   const absByUser = {};
-  allAbsencesCache.forEach(a => {
-    if (!absByUser[a.userId]) absByUser[a.userId] = {};
-    absByUser[a.userId][a.date] = a.type;
-  });
-
-  const calHolidays = getHolidaysForDates(days.map(d => d.ds));
-
-  const TYPE_STYLE = {
-    afspad:      { label: 'Afspad.',  bg: '#CFD8DC', color: '#263238' },
-    ferielov:    { label: 'Vac.',     bg: '#B0BEC5', color: '#1C313A' },
-    feriefridag: { label: 'Feriefriday', bg: '#D7CCC8', color: '#3E2723' },
-    sick:        { label: 'Sick',     bg: '#BDBDBD', color: '#212121' },
-    day_off:     { label: 'Day off',  bg: '#E0E0E0', color: '#424242' }
-  };
+  allAbsencesCache.forEach(a => { if (!absByUser[a.userId]) absByUser[a.userId]={}; absByUser[a.userId][a.date]=a.type; });
 
   const employees = allUsersCache.filter(u => u.active !== false);
-  if (!employees.length) {
-    container.innerHTML = `<p class="empty-state">No active employees.</p>`;
-    return;
-  }
+  if (!employees.length) { container.innerHTML = '<p class="empty-state">No active employees.</p>'; return; }
 
-  const monthHeaderRow = `<tr>
-    <th class="vac-name-col"></th>
-    ${monthGroups.map(m => `<th colspan="${m.count}" class="vac-month-header">${m.label.toUpperCase()}</th>`).join('')}
-  </tr>`;
-
-  const weekHeaderRow = `<tr>
-    <th class="vac-name-col"></th>
-    ${weekGroups.map(w => `<th colspan="${w.count}" class="vac-week-num">W${w.week}</th>`).join('')}
-  </tr>`;
-
-  const dayHeaderRow = `<tr>
-    <th class="vac-name-col vac-name"></th>
-    ${days.map(d => `<th class="vac-col-day${d.isWE ? ' vac-we' : ''}${d.isToday ? ' vac-today-col' : ''}${d.isNewMonth ? ' vac-new-month' : ''}"${calHolidays[d.ds] ? ' style="background:#EDEEE9"' : ''}>
-      <div class="vac-day-num">${d.num}</div>
-    </th>`).join('')}
-  </tr>`;
-
-  // Build hours lookup: { userId: { date: { projectId: hours } } }
+  // Hours lookup
   const hoursLookup = {};
   allEntriesCache.forEach(en => {
     if (!hoursLookup[en.userId]) hoursLookup[en.userId] = {};
     if (!hoursLookup[en.userId][en.date]) hoursLookup[en.userId][en.date] = {};
-    hoursLookup[en.userId][en.date][en.projectId] = (hoursLookup[en.userId][en.date][en.projectId] || 0) + en.hours;
+    hoursLookup[en.userId][en.date][en.projectId] = (hoursLookup[en.userId][en.date][en.projectId]||0) + en.hours;
   });
 
-  const getWorkItems = (uid, dateStr) => {
-    const dayEntries = hoursLookup[uid]?.[dateStr];
-    if (!dayEntries) return [];
-    return Object.entries(dayEntries)
-      .sort((a, b) => b[1] - a[1]) // most hours first
-      .map(([id]) => {
-        const proj = findProjectAnywhere(id);
-        if (!proj) return null;
-        if (proj._extraType) {
-          const c = EXTRA_TYPE_COLORS[proj._extraType] || { bg: '#B0BEC5', text: '#263238' };
-          return { bg: c.bg, text: c.text, name: proj.name || proj._extraType.toUpperCase() };
-        }
-        const color = getProjectBadgeColor(proj);
-        return color ? { bg: color, text: '#fff', name: proj.name } : null;
-      })
-      .filter(Boolean);
+  const TYPE_STYLE_CAL = {
+    afspad:      { label:'Afspad.',      bg:'#CFD8DC', text:'#263238' },
+    ferielov:    { label:'Vacation',     bg:'#B0BEC5', text:'#1C313A' },
+    feriefridag: { label:'Feriefriday', bg:'#D7CCC8', text:'#3E2723' },
+    sick:        { label:'Sick',         bg:'#BDBDBD', text:'#212121' },
+    day_off:     { label:'Day off',      bg:'#E0E0E0', text:'#424242' }
   };
 
-  const bodyRows = employees.map(u => {
-    const userAbs = absByUser[u.uid] || {};
-    const cells = days.map(d => {
-      const type    = userAbs[d.ds];
-      const holiday = calHolidays[d.ds];
-      const s       = type ? TYPE_STYLE[type] : null;
-      const isGrey  = d.isWE || !!holiday;
+  const getProjectIv = (uid, cols, keyFn, dateFn) => {
+    const ivs = [];
+    const pids = new Set();
+    cols.forEach((col, ci) => {
+      (dateFn ? dateFn(col) : [col.ds]).forEach(ds => {
+        Object.keys(hoursLookup[uid]?.[ds]||{}).forEach(pid => pids.add(pid));
+      });
+    });
+    for (const pid of pids) {
+      let runS = null;
+      for (let i=0; i<cols.length; i++) {
+        const dates = dateFn ? dateFn(cols[i]) : [cols[i].ds];
+        const h = dates.reduce((s,ds) => s+(hoursLookup[uid]?.[ds]?.[pid]||0), 0);
+        if (h>0) { if (runS===null) runS=i; }
+        else { if (runS!==null) { ivs.push({s:runS,e:i-1,pid}); runS=null; } }
+      }
+      if (runS!==null) ivs.push({s:runS,e:cols.length-1,pid});
+    }
+    return ivs.map(iv => {
+      const proj = findProjectAnywhere(iv.pid);
+      if (!proj) return null;
+      const c = proj._extraType ? (EXTRA_TYPE_COLORS[proj._extraType]||{bg:'#B0BEC5',text:'#263238'}) : { bg: getProjectBadgeColor(proj)||'#78909C', text:'#fff' };
+      return { s:iv.s, e:iv.e, name:proj.name, bg:c.bg, text:c.text };
+    }).filter(Boolean);
+  };
 
-      if (s) {
-        const style = `background:${s.bg};color:${s.color}`;
-        const title = ABSENCE_TYPES.find(x => x.value === type)?.label || type;
-        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="${style}" title="${title}">${s.label}</td>`;
+  const getAbsIvs = (uid, cols, dateFn) => {
+    const ivs = [];
+    const types = new Set();
+    cols.forEach(col => { (dateFn ? dateFn(col) : [col.ds]).forEach(ds => { const t=absByUser[uid]?.[ds]; if(t) types.add(t); }); });
+    for (const absType of types) {
+      let runS=null;
+      for (let i=0;i<cols.length;i++) {
+        const dates = dateFn ? dateFn(cols[i]) : [cols[i].ds];
+        const hasAbs = dates.some(ds => absByUser[uid]?.[ds]===absType);
+        if (hasAbs) { if (runS===null) runS=i; }
+        else { if (runS!==null) { ivs.push({s:runS,e:i-1,absType}); runS=null; } }
       }
-      if (holiday) {
-        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="background:#EDEEE9" title="${holiday}">
-          <span class="holiday-name-cell" style="font-size:0.6rem">${holiday}</span>
-        </td>`;
-      }
-      if (isGrey) {
-        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="background:var(--line-soft)"></td>`;
-      }
-      if (d.isToday) {
-        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="background:var(--accent-soft)"></td>`;
-      }
+      if (runS!==null) ivs.push({s:runS,e:cols.length-1,absType});
+    }
+    return ivs.map(iv => {
+      const st = TYPE_STYLE_CAL[iv.absType]||{label:iv.absType,bg:'#B0BEC5',text:'#263238'};
+      return {s:iv.s,e:iv.e,name:st.label,bg:st.bg,text:st.text};
+    });
+  };
 
-      const items = getWorkItems(u.uid, d.ds);
-      if (!items.length) {
-        return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}"></td>`;
+  const renderGanttRows = (uid, cols, projectIvs, absIvs, colMeta) => {
+    const allIvs = [...projectIvs, ...absIvs];
+    if (!allIvs.length) {
+      const cells = cols.map((col, ci) => {
+        const m = colMeta[ci];
+        return `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''}"${m.isToday?' class="vac-today-col"':''}></td>`;
+      }).join('');
+      return `<tr><th class="vac-name">${escapeHtml(allUsersCache.find(u=>u.uid===uid)?.name||uid)}</th>${cells}</tr>`;
+    }
+    const layers = packIntervals(allIvs);
+    const numRows = layers.length;
+    return layers.map((layer, li) => {
+      // Fill gaps per column
+      let pos = 0;
+      let cells = '';
+      for (const iv of layer) {
+        // empty gap
+        for (let gi=pos; gi<iv.s; gi++) {
+          const m = colMeta[gi];
+          cells += `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''};${m.todayBorder?'border-left:2px solid #E53935;':''}" ></td>`;
+        }
+        // bar
+        cells += `<td colspan="${iv.e-iv.s+1}" class="vac-cell gantt-bar-cell" style="background:${iv.bg};color:${iv.text};padding:1px 4px;vertical-align:middle">
+          <span style="font-size:0.62rem;font-weight:600;white-space:nowrap;overflow:hidden;display:block;line-height:1.4">${iv.name.slice(0,7)}</span></td>`;
+        pos = iv.e+1;
       }
-      const chips = items.map(item =>
-        `<span style="display:block;background:${item.bg};color:${item.text};font-size:0.6rem;font-weight:600;line-height:1.3;padding:0 2px;margin-bottom:1px;overflow:hidden;white-space:nowrap" title="${escapeHtml(item.name)}">${item.name.slice(0, 7)}</span>`
-      ).join('');
-      return `<td class="vac-cell${d.isNewMonth ? ' vac-new-month' : ''}" style="padding:1px 2px">${chips}</td>`;
+      // trailing gap
+      for (let gi=pos; gi<cols.length; gi++) {
+        const m = colMeta[gi];
+        cells += `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''};${m.todayBorder?'border-left:2px solid #E53935;':''}" ></td>`;
+      }
+      const nameCell = li===0 ? `<th class="vac-name" rowspan="${numRows}">${escapeHtml(allUsersCache.find(u=>u.uid===uid)?.name||uid)}</th>` : '';
+      return `<tr>${nameCell}${cells}</tr>`;
     }).join('');
-    return `<tr><th class="vac-name">${escapeHtml(u.name)}</th>${cells}</tr>`;
-  }).join('');
+  };
 
-  container.innerHTML = `
-    <div class="vac-scroll">
-      <table class="vac-grid">
-        <thead>${monthHeaderRow}${weekHeaderRow}${dayHeaderRow}</thead>
-        <tbody>${bodyRows}</tbody>
-      </table>
-    </div>`;
+  if (calViewMode === 'daily') {
+    // 2-month daily view
+    const m0 = vacCalendarDate.getMonth(), y0 = vacCalendarDate.getFullYear();
+    const m1 = (m0+1)%12, y1 = m0===11?y0+1:y0;
+    const days = [];
+    [[y0,m0],[y1,m1]].forEach(([y,m]) => {
+      const dim = new Date(y,m+1,0).getDate();
+      for (let d=1;d<=dim;d++) {
+        const dt = new Date(y,m,d);
+        const ds = toISODate(dt);
+        const dow = dt.getDay();
+        days.push({ds, d, m, y, isWE:dow===0||dow===6, isToday:ds===today, newMonth:d===1});
+      }
+    });
+    if (label) label.textContent = `${new Date(y0,m0).toLocaleString('en',{month:'long'})} – ${new Date(y1,m1).toLocaleString('en',{month:'long',year:'numeric'})}`;
+    const calHolidays = getActiveHolidaysForDates(days.map(d=>d.ds));
+    const colMeta = days.map(d => ({
+      bg: calHolidays[d.ds] ? '#EDEEE9' : getClosingDayForDate(d.ds) ? '#EDEEE9' : d.isWE ? 'var(--line-soft)' : d.isToday ? '' : '',
+      newMonth: d.newMonth,
+      todayBorder: d.isToday,
+      isToday: d.isToday
+    }));
+
+    // Build month header
+    const months = [];
+    days.forEach((d,i) => {
+      if (!months.length || d.m !== months[months.length-1].m) months.push({m:d.m,y:d.y,count:1});
+      else months[months.length-1].count++;
+    });
+    const monthRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      months.map(m=>`<th colspan="${m.count}" class="vac-month-header">${new Date(m.y,m.m).toLocaleString('en',{month:'long'}).toUpperCase()} ${m.y}</th>`).join('') + '</tr>';
+    const dayRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      days.map(d=>`<th class="vac-col-day${d.isWE?' cal-we':''}${d.isToday?' cal-today':''}" style="${calHolidays[d.ds]||getClosingDayForDate(d.ds)?'background:#EDEEE9':''}">${d.d}</th>`).join('') + '</tr>';
+
+    const bodyRows = employees.map(u => {
+      const pIvs = getProjectIv(u.uid, days, null, null);
+      const aIvs = getAbsIvs(u.uid, days, null);
+      return renderGanttRows(u.uid, days, pIvs, aIvs, colMeta);
+    }).join('');
+
+    container.innerHTML = `<div class="vac-scroll"><table class="vac-grid">
+      <thead>${monthRow}${dayRow}</thead><tbody>${bodyRows}</tbody>
+    </table></div>`;
+
+  } else if (calViewMode === 'weekly') {
+    // Weekly: show ~9 weeks from start of vacCalendarDate month
+    const startWeekMonday = getMonday(vacCalendarDate);
+    const weeks = Array.from({length:9}, (_,i) => {
+      const mon = addDays(startWeekMonday, i*7);
+      const dates = Array.from({length:7}, (_,j) => toISODate(addDays(mon,j)));
+      return { mon, dates, wn: isoWeekNumber(mon), y: mon.getFullYear(), m: mon.getMonth(), isCurrentWeek: dates.includes(today) };
+    });
+    if (label) {
+      const first = weeks[0].mon, last = addDays(weeks[weeks.length-1].mon,6);
+      label.textContent = `W${isoWeekNumber(first)} – W${isoWeekNumber(addDays(weeks[weeks.length-1].mon,0))} · ${first.getFullYear()}`;
+    }
+    const calHolidays = getActiveHolidaysForDates(weeks.flatMap(w=>w.dates));
+    const colMeta = weeks.map(w => ({ bg: w.isCurrentWeek?'':'', newMonth: false, todayBorder: false, isCurrentWeek: w.isCurrentWeek }));
+
+    const months = [];
+    weeks.forEach((w,i) => {
+      if (!months.length || w.m !== months[months.length-1].m) months.push({m:w.m,y:w.y,count:1});
+      else months[months.length-1].count++;
+    });
+    const monthRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      months.map(m=>`<th colspan="${m.count}" class="vac-month-header">${new Date(m.y,m.m).toLocaleString('en',{month:'long'}).toUpperCase()}</th>`).join('') + '</tr>';
+    const weekRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      weeks.map(w=>`<th class="vac-col-day${w.isCurrentWeek?' cal-today':''}">W${w.wn}</th>`).join('') + '</tr>';
+
+    const bodyRows = employees.map(u => {
+      const pIvs = getProjectIv(u.uid, weeks, null, w => w.dates);
+      const aIvs = getAbsIvs(u.uid, weeks, w => w.dates);
+      return renderGanttRows(u.uid, weeks, pIvs, aIvs, colMeta);
+    }).join('');
+
+    container.innerHTML = `<div class="vac-scroll"><table class="vac-grid">
+      <thead>${monthRow}${weekRow}</thead><tbody>${bodyRows}</tbody>
+    </table></div>`;
+
+  } else {
+    // Monthly: 12 months from vacCalendarDate
+    const months = Array.from({length:12}, (_,i) => {
+      const m = (vacCalendarDate.getMonth()+i)%12;
+      const y = vacCalendarDate.getFullYear() + Math.floor((vacCalendarDate.getMonth()+i)/12);
+      const dim = new Date(y,m+1,0).getDate();
+      const dates = Array.from({length:dim}, (_,d) => toISODate(new Date(y,m,d+1)));
+      const isCurrentMonth = new Date().getFullYear()===y && new Date().getMonth()===m;
+      return {m,y,dates,isCurrentMonth};
+    });
+    if (label) {
+      label.textContent = `${new Date(months[0].y,months[0].m).toLocaleString('en',{month:'long',year:'numeric'})} – ${new Date(months[11].y,months[11].m).toLocaleString('en',{month:'long',year:'numeric'})}`;
+    }
+    const colMeta = months.map(m => ({ bg:'', newMonth:false, todayBorder:false }));
+
+    const years = [];
+    months.forEach((m,i) => {
+      if (!years.length||m.y!==years[years.length-1].y) years.push({y:m.y,count:1});
+      else years[years.length-1].count++;
+    });
+    const yearRow = years.length>1 ? '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      years.map(y=>`<th colspan="${y.count}" class="vac-month-header">${y.y}</th>`).join('') + '</tr>' : '';
+    const monthRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
+      months.map(m=>`<th class="vac-col-day${m.isCurrentMonth?' cal-today':''}">${new Date(m.y,m.m).toLocaleString('en',{month:'short'})}</th>`).join('') + '</tr>';
+
+    const bodyRows = employees.map(u => {
+      const pIvs = getProjectIv(u.uid, months, null, m => m.dates);
+      const aIvs = getAbsIvs(u.uid, months, m => m.dates);
+      return renderGanttRows(u.uid, months, pIvs, aIvs, colMeta);
+    }).join('');
+
+    container.innerHTML = `<div class="vac-scroll"><table class="vac-grid">
+      <thead>${yearRow}${monthRow}</thead><tbody>${bodyRows}</tbody>
+    </table></div>`;
+  }
 }
+
 
 function listenRates() {
   ratesUnsub = db.collection('rates').onSnapshot((snap) => {
