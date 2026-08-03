@@ -49,7 +49,8 @@ let userEntriesCache = [];
 let userAbsencesCache = [];
 let allAbsencesCache = [];
 let allEntriesCache = [];
-let officeCalendarCache = {}; // year string -> { closingDays:[{date,name}], deletedHolidays:[date,...] }
+let officeCalendarCache = {};
+let timesheetLocksCache = []; // year string -> { closingDays:[{date,name}], deletedHolidays:[date,...] }
 
 // Called directly from the parent toggle span in the projects table
 window.toggleEditorParent = (pid) => {
@@ -673,6 +674,7 @@ auth.onAuthStateChanged(async (user) => {
 
   listenProjects();
   listenOfficeCalendar();
+  listenTimesheetLocks();
   if (currentUser.role === 'user') {
     listenUserEntries();
     listenUserRates();
@@ -794,6 +796,46 @@ function listenAllUsers() {
 // ============================================================
 // Editor: Employee Timesheets
 // ============================================================
+
+function renderSubmittedTimesheets() {
+  const card = $('submittedTimesheetsCard');
+  const body = $('submittedTimesheetsBody');
+  if (!card || !body) return;
+  const locks = [...timesheetLocksCache].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  card.style.display = locks.length ? '' : 'none';
+  if (!locks.length) return;
+  body.innerHTML = `<table class="ledger-table" style="margin:0">
+    <thead><tr><th>Employee</th><th>Week</th><th>Submitted</th><th></th></tr></thead>
+    <tbody>${locks.map(l => {
+      const d = new Date(l.weekStart + 'T00:00:00');
+      const weekEnd = addDays(d, 6);
+      const weekLabel = `Week ${isoWeekNumber(d)} · ${d.getFullYear()} (${formatDate(l.weekStart)} – ${formatDate(toISODate(weekEnd))})`;
+      const submitted = l.submittedAt?.toDate ? l.submittedAt.toDate().toLocaleDateString('da-DK') : '—';
+      return `<tr>
+        <td>${escapeHtml(l.userName || '—')}</td>
+        <td>${weekLabel}</td>
+        <td>${submitted}</td>
+        <td class="row-actions">
+          <button class="link-btn" onclick="unlockWeek('${l.id}', '${escapeHtml(l.userName || '')}', '${weekLabel}')">🔓 Unlock</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+window.unlockWeek = async (lockId, userName, weekLabel) => {
+  if (!confirm(`Unlock ${userName}'s timesheet for ${weekLabel}?\n\nThey will be able to edit their hours again.`)) return;
+  await db.collection('timesheetLocks').doc(lockId).delete();
+  showStamp('Unlocked');
+};
+
+function listenTimesheetLocks() {
+  db.collection('timesheetLocks').onSnapshot(snap => {
+    timesheetLocksCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderWeekGrid();
+    if (currentUser.role === 'editor') renderSubmittedTimesheets();
+  });
+}
 
 function listenOfficeCalendar() {
   db.collection('officeCalendar').onSnapshot(snap => {
@@ -2444,7 +2486,23 @@ function renderEditorTimesheet() {
 // ============================================================
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-$('weekPrevBtn').addEventListener('click', () => { weekStart = addDays(weekStart, -7); renderWeekGrid(); });
+$('weekSubmitBtn').addEventListener('click', async () => {
+  const weekKey = toISODate(weekStart);
+  const lockId  = `${currentUser.uid}_${weekKey}`;
+  const isLocked = timesheetLocksCache.some(l => l.id === lockId);
+  if (isLocked) return; // already locked, editor must unlock
+  if (!confirm(`Submit hours for week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}?\n\nAfter submitting, hours for this week can only be changed by an editor.`)) return;
+  await db.collection('timesheetLocks').doc(lockId).set({
+    userId: currentUser.uid, userName: currentUser.name,
+    weekStart: weekKey, submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  showStamp('Week submitted');
+});
+
+function isWeekLocked(uid, weekStartDate) {
+  const lockId = `${uid}_${toISODate(weekStartDate)}`;
+  return timesheetLocksCache.some(l => l.id === lockId);
+}
 $('weekNextBtn').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderWeekGrid(); });
 $('weekTodayBtn').addEventListener('click', () => { weekStart = getMonday(new Date()); renderWeekGrid(); });
 
@@ -2483,6 +2541,16 @@ function sortItems(items) {
 function renderWeekGrid() {
   if (!currentUser || currentUser.role !== 'user') return;
   console.log('[renderWeekGrid] projectsCache:', projectsCache.length, 'currentUser:', currentUser?.uid);
+
+  // Update submit button
+  const locked = isWeekLocked(currentUser.uid, weekStart);
+  const submitBtn = $('weekSubmitBtn');
+  if (submitBtn) {
+    submitBtn.textContent = locked ? '🔒 Submitted' : '🔓 Submit';
+    submitBtn.title = locked ? 'This week is submitted — only an editor can unlock it' : 'Submit this week\'s hours';
+    submitBtn.disabled = locked;
+    submitBtn.style.opacity = locked ? '0.7' : '';
+  }
 
   $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}`;
   $('weekLabel').textContent = weekRangeLabel(weekStart);
@@ -2557,9 +2625,9 @@ function renderWeekGrid() {
       if (holiday || closingDay) {
         return `<td class="holiday-cell"></td>`;
       }
-      const disabled = isPaused || !!absType;
+      const disabled = isPaused || !!absType || locked;
       const dimmed = !!absType;
-      const title = isPaused ? 'This project is paused' : 'Absence registered for this day';
+      const title = isPaused ? 'This project is paused' : locked ? 'Week submitted — contact an editor to unlock' : 'Absence registered for this day';
       return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}">
         <input type="number" min="0" step="0.25" inputmode="decimal"
           data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
@@ -2631,7 +2699,7 @@ function renderWeekGrid() {
     const a = userAbsencesCache.find(x => x.date === ds);
     const opts = absenceTypeList.map(t =>
       `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
-    return `<td><select class="absence-select" data-date="${ds}" data-type="${a ? a.type : ''}">${opts}</select></td>`;
+    return `<td><select class="absence-select" data-date="${ds}" data-type="${a ? a.type : ''}"${locked ? ' disabled title="Week submitted"' : ''}>${opts}</select></td>`;
   }).join('');
   $('weekGridBody').innerHTML += `
     <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
