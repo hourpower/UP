@@ -1020,17 +1020,17 @@ function renderVacationCalendar() {
         // empty gap
         for (let gi=pos; gi<iv.s; gi++) {
           const m = colMeta[gi];
-          cells += `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''};${m.todayBorder?'border-left:2px solid #E53935;':''}" ></td>`;
+          cells += `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''}" ></td>`;
         }
         // bar
         cells += `<td colspan="${iv.e-iv.s+1}" class="vac-cell gantt-bar-cell" style="background:${iv.bg};color:${iv.text};padding:1px 4px;vertical-align:middle">
-          <span style="font-size:0.62rem;font-weight:600;white-space:nowrap;overflow:hidden;display:block;line-height:1.4">${iv.name.slice(0,7)}</span></td>`;
+          <span style="font-size:0.62rem;font-weight:600;white-space:nowrap;overflow:hidden;display:block;line-height:1.4">${iv.name.slice(0,10)}</span></td>`;
         pos = iv.e+1;
       }
       // trailing gap
       for (let gi=pos; gi<cols.length; gi++) {
         const m = colMeta[gi];
-        cells += `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''};${m.todayBorder?'border-left:2px solid #E53935;':''}" ></td>`;
+        cells += `<td class="vac-cell${m.newMonth?' vac-new-month':''}" style="${m.bg?`background:${m.bg}`:''}" ></td>`;
       }
       const nameCell = li===0 ? `<th class="vac-name" rowspan="${numRows}">${escapeHtml(allUsersCache.find(u=>u.uid===uid)?.name||uid)}</th>` : '';
       return `<tr>${nameCell}${cells}</tr>`;
@@ -1056,7 +1056,7 @@ function renderVacationCalendar() {
     const colMeta = days.map(d => ({
       bg: calHolidays[d.ds] ? '#EDEEE9' : getClosingDayForDate(d.ds) ? '#EDEEE9' : d.isWE ? 'var(--line-soft)' : d.isToday ? '' : '',
       newMonth: d.newMonth,
-      todayBorder: d.isToday,
+      todayBorder: false,
       isToday: d.isToday
     }));
 
@@ -1069,7 +1069,7 @@ function renderVacationCalendar() {
     const monthRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
       months.map(m=>`<th colspan="${m.count}" class="vac-month-header">${new Date(m.y,m.m).toLocaleString('en',{month:'long'}).toUpperCase()} ${m.y}</th>`).join('') + '</tr>';
     const dayRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
-      days.map(d=>`<th class="vac-col-day${d.isWE?' cal-we':''}${d.isToday?' cal-today':''}" style="${calHolidays[d.ds]||getClosingDayForDate(d.ds)?'background:#EDEEE9':''}">${d.d}</th>`).join('') + '</tr>';
+      days.map(d=>`<th class="vac-col-day${d.isWE?' cal-we':''}${d.isToday?' cal-today':''}">${d.d}</th>`).join('') + '</tr>';
 
     const bodyRows = employees.map(u => {
       const pIvs = getProjectIv(u.uid, days, null, null);
@@ -1084,7 +1084,7 @@ function renderVacationCalendar() {
   } else if (calViewMode === 'weekly') {
     // Weekly: show ~9 weeks from start of vacCalendarDate month
     const startWeekMonday = getMonday(vacCalendarDate);
-    const weeks = Array.from({length:9}, (_,i) => {
+    const weeks = Array.from({length:52}, (_,i) => {
       const mon = addDays(startWeekMonday, i*7);
       const dates = Array.from({length:7}, (_,j) => toISODate(addDays(mon,j)));
       return { mon, dates, wn: isoWeekNumber(mon), y: mon.getFullYear(), m: mon.getMonth(), isCurrentWeek: dates.includes(today) };
@@ -1118,7 +1118,7 @@ function renderVacationCalendar() {
 
   } else {
     // Monthly: 12 months from vacCalendarDate
-    const months = Array.from({length:12}, (_,i) => {
+    const months = Array.from({length:36}, (_,i) => {
       const m = (vacCalendarDate.getMonth()+i)%12;
       const y = vacCalendarDate.getFullYear() + Math.floor((vacCalendarDate.getMonth()+i)/12);
       const dim = new Date(y,m+1,0).getDate();
@@ -1127,7 +1127,7 @@ function renderVacationCalendar() {
       return {m,y,dates,isCurrentMonth};
     });
     if (label) {
-      label.textContent = `${new Date(months[0].y,months[0].m).toLocaleString('en',{month:'long',year:'numeric'})} – ${new Date(months[11].y,months[11].m).toLocaleString('en',{month:'long',year:'numeric'})}`;
+      label.textContent = `${new Date(months[0].y,months[0].m).toLocaleString('en',{month:'long',year:'numeric'})} – ${new Date(months[11].y,months[35].m).toLocaleString('en',{month:'long',year:'numeric'})}`;
     }
     const colMeta = months.map(m => ({ bg:'', newMonth:false, todayBorder:false }));
 
