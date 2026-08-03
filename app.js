@@ -1741,6 +1741,20 @@ $('totalsAllTime').addEventListener('click', () => {
   $('totalsTo').value   = '';
   renderProjectTotals();
 });
+$('totalsThisMonth').addEventListener('click', () => {
+  const n = new Date();
+  const y = n.getFullYear(), m = n.getMonth();
+  $('totalsFrom').value = toISODate(new Date(y, m, 1));
+  $('totalsTo').value   = toISODate(new Date(y, m+1, 0));
+  renderProjectTotals();
+});
+$('totalsLastMonth').addEventListener('click', () => {
+  const n = new Date();
+  const y = n.getFullYear(), m = n.getMonth() - 1;
+  $('totalsFrom').value = toISODate(new Date(y, m, 1));
+  $('totalsTo').value   = toISODate(new Date(y, m+1, 0));
+  renderProjectTotals();
+});
 $('toggleTotalsSummary').addEventListener('click', () => {
   projectTotalsShowSummary = !projectTotalsShowSummary;
   $('toggleTotalsSummary').textContent = `Summary ${projectTotalsShowSummary ? '✓' : '✗'}`;
