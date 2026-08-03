@@ -1090,7 +1090,7 @@ function renderVacationCalendar() {
       else weekGroups2[weekGroups2.length-1].count++;
     });
     const weekRow2 = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
-      weekGroups2.map(w=>`<th colspan="${w.count}" class="vac-week-num-row">W${w.wn}</th>`).join('') + '</tr>';
+      weekGroups2.map(w=>`<th colspan="${w.count}" class="vac-col-day">W${w.wn}</th>`).join('') + '</tr>';
     const dayRow = '<tr class="cal-head-row"><th class="vac-name-col"></th>' +
       days.map(d=>`<th class="vac-col-day${d.isWE?' cal-we':''}${d.isToday?' cal-today':''}">${d.d}</th>`).join('') + '</tr>';
 
