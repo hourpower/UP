@@ -985,10 +985,12 @@ function showPlanAddDialog(uid, startDate, endDate) {
   $('planModalDelete').style.display = 'none';
   $('planModalSave').onclick = async () => {
     const projectId = $('planModalProject').value;
-    if (!projectId) return;
+    if (!projectId) { alert('Please pick a project.'); return; }
     const pct = Math.max(1, Math.min(200, parseInt($('planModalPct').value)||100));
-    await db.collection('planningBars').add({ userId:uid, projectId, startDate, endDate, percentage:pct, createdAt:firebase.firestore.FieldValue.serverTimestamp() });
-    closePlanModal(); showStamp('Saved');
+    try {
+      await db.collection('planningBars').add({ userId:uid, projectId, startDate, endDate, percentage:pct, createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+      closePlanModal(); showStamp('Saved');
+    } catch(err) { alert('Could not save: ' + err.message + '\n\nMake sure the Firestore rules are published in Firebase Console.'); }
   };
   openPlanModal();
 }
