@@ -2011,8 +2011,8 @@ async function exportTotalsPdf() {
   }
 }
 $('totalsProjectSelect').addEventListener('change', () => {
-  displayToIso($('totalsFrom').value) = '';
-  displayToIso($('totalsTo').value)   = '';
+  $('totalsFrom').value = '';
+  $('totalsTo').value   = '';
   projectTotalsShowSummary = true;
   $('toggleTotalsSummary').textContent = 'Summary ✓';
   projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
@@ -2027,27 +2027,27 @@ $('totalsFrom').addEventListener('change', renderProjectTotals);
 $('totalsTo').addEventListener('change', renderProjectTotals);
 $('totalsThisYear').addEventListener('click', () => {
   const y = new Date().getFullYear();
-  displayToIso($('totalsFrom').value) = `${y}-01-01`;
-  displayToIso($('totalsTo').value)   = `${y}-12-31`;
+  $('totalsFrom').value = isoToDisplay(`${y}-01-01`);
+  $('totalsTo').value   = isoToDisplay(`${y}-12-31`);
   renderProjectTotals();
 });
 $('totalsAllTime').addEventListener('click', () => {
-  displayToIso($('totalsFrom').value) = '';
-  displayToIso($('totalsTo').value)   = '';
+  $('totalsFrom').value = '';
+  $('totalsTo').value   = '';
   renderProjectTotals();
 });
 $('totalsThisMonth').addEventListener('click', () => {
   const n = new Date();
   const y = n.getFullYear(), m = n.getMonth();
-  displayToIso($('totalsFrom').value) = toISODate(new Date(y, m, 1));
-  displayToIso($('totalsTo').value)   = toISODate(new Date(y, m+1, 0));
+  $('totalsFrom').value = isoToDisplay(toISODate(new Date(y, m, 1)));
+  $('totalsTo').value   = isoToDisplay(toISODate(new Date(y, m+1, 0)));
   renderProjectTotals();
 });
 $('totalsLastMonth').addEventListener('click', () => {
   const n = new Date();
   const y = n.getFullYear(), m = n.getMonth() - 1;
-  displayToIso($('totalsFrom').value) = toISODate(new Date(y, m, 1));
-  displayToIso($('totalsTo').value)   = toISODate(new Date(y, m+1, 0));
+  $('totalsFrom').value = isoToDisplay(toISODate(new Date(y, m, 1)));
+  $('totalsTo').value   = isoToDisplay(toISODate(new Date(y, m+1, 0)));
   renderProjectTotals();
 });
 $('toggleTotalsSummary').addEventListener('click', () => {
@@ -3374,14 +3374,14 @@ $('absenceCardToggle').addEventListener('click', () => {
 
 const absSetThisYear = () => {
   const y = new Date().getFullYear();
-  displayToIso($('absFromDate').value) = `${y}-01-01`;
-  displayToIso($('absToDate').value)   = `${y}-12-31`;
+  $('absFromDate').value = isoToDisplay(`${y}-01-01`);
+  $('absToDate').value   = isoToDisplay(`${y}-12-31`);
   renderAbsenceSummary();
 };
 const absSetLastYear = () => {
   const y = new Date().getFullYear() - 1;
-  displayToIso($('absFromDate').value) = `${y}-01-01`;
-  displayToIso($('absToDate').value)   = `${y}-12-31`;
+  $('absFromDate').value = isoToDisplay(`${y}-01-01`);
+  $('absToDate').value   = isoToDisplay(`${y}-12-31`);
   renderAbsenceSummary();
 };
 const absSetAllTime  = () => { displayToIso($('absFromDate').value) = ''; displayToIso($('absToDate').value) = ''; renderAbsenceSummary(); };
@@ -3441,7 +3441,7 @@ $('addClosingDayBtn').addEventListener('click', async () => {
     await db.collection('officeCalendar').doc(String(yr)).set(
       { closingDays: newClosing }, { merge: true }
     );
-    displayToIso($('closingDayDate').value) = '';
+    $('closingDayDate').value = '';
     showStamp('Saved');
   } catch (err) {
     errEl.textContent = 'Could not save: ' + err.message;
@@ -3776,7 +3776,7 @@ function openEntryEditPanel(entryId) {
   if (!en) return;
   $('editEntryId').value = en.id;
   $('editEntryPerson').textContent = en.userName;
-  displayToIso($('editEntryDate').value) = en.date;
+  $('editEntryDate').value = isoToDisplay(en.date);
   $('editEntryHours').value = en.hours;
   $('editEntryNote').value = en.note || '';
   populateEditProjectSelect(en.projectId);
