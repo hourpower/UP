@@ -1181,3 +1181,19 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .vac-grid thead .vac-month-header { background:#222e42; color:rgba(255,255,255,0.9); font-size:0.7rem; text-align:left; padding-left:6px; }
 .gantt-bar-cell { padding:1px 3px !important; vertical-align:middle; }
 .vac-week-num-row { background:#2a3a52 !important; color:rgba(255,255,255,0.6) !important; font-size:0.64rem; font-weight:500; text-align:left; padding-left:4px; border-left:1px solid rgba(255,255,255,0.15) !important; }
+
+/* ===== Planning Calendar ===== */
+.plan-name-col { min-width: 140px; }
+.plan-name { text-align: left; padding: 4px 8px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; border-right: 1px solid var(--line); }
+.plan-total-header { background: #1a2332 !important; color: rgba(255,255,255,0.75) !important; font-size: 0.68rem !important; text-align: right !important; padding: 4px 8px !important; min-width: 52px; border-left: 1px solid rgba(255,255,255,0.12) !important; }
+.plan-total-cell { text-align: right; padding: 4px 8px; font-size: 0.78rem; color: var(--ink-soft); border-left: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
+.plan-cell { cursor: crosshair; }
+.plan-drag-hi { background: rgba(47,93,90,0.25) !important; outline: 1px solid rgba(47,93,90,0.5); }
+.plan-bar { cursor: pointer; }
+.plan-bar:hover { filter: brightness(1.12); }
+.plan-grid { user-select: none; }
+
+/* Modal */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-box { background: var(--paper-card); border-radius: 10px; padding: 24px 28px; min-width: 320px; max-width: 440px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.modal-box h3 { margin: 0 0 6px; font-size: 1rem; }

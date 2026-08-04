@@ -169,7 +169,9 @@ function computeParentFees(parentId) {
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 let vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-let calViewMode = 'daily';
+let planningBarsCache = [];
+let planViewMode = 'daily';
+let planCalDate  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 
 function packIntervals(ivs) {
   // Sort: by start position first, then Projects before AQ, then most hours on top
@@ -709,6 +711,7 @@ auth.onAuthStateChanged(async (user) => {
       listenAllUsers();
       listenRates();
       listenAllAbsences();
+      listenPlanningBars();
     } catch (err) {
       console.error('[Editor init error]', err);
       alert('Editor init error: ' + err.message + '\n\nCheck the browser console for details.');
@@ -852,6 +855,13 @@ window.unlockWeek = async (lockId, userName, weekLabel) => {
   showStamp('Unlocked');
 };
 
+function listenPlanningBars() {
+  db.collection('planningBars').onSnapshot(snap => {
+    planningBarsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if ($('planningCalToggle')?.getAttribute('aria-expanded') === 'true') renderPlanningCalendar();
+  });
+}
+
 function listenTimesheetLocks() {
   db.collection('timesheetLocks').onSnapshot(snap => {
     timesheetLocksCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -930,6 +940,243 @@ function findProjectAnywhere(id) {
     if (e) return { ...e, _extraType: type };
   }
   return null;
+}
+
+// ============================================================
+// Planning Calendar — event wiring
+// ============================================================
+if ($('planningCalToggle')) {
+  $('planCalPrevBtn').addEventListener('click',  (e) => { e.stopPropagation(); planCalDate=new Date(planCalDate.getFullYear(),planCalDate.getMonth()-1,1); renderPlanningCalendar(); });
+  $('planCalNextBtn').addEventListener('click',  (e) => { e.stopPropagation(); planCalDate=new Date(planCalDate.getFullYear(),planCalDate.getMonth()+1,1); renderPlanningCalendar(); });
+  $('planCalTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); planCalDate=new Date(new Date().getFullYear(),new Date().getMonth(),1); renderPlanningCalendar(); });
+  $('planningCalToggle').addEventListener('click', () => {
+    if ($('planningCalToggle').getAttribute('aria-expanded') === 'true') renderPlanningCalendar();
+  });
+  ['planModeDaily','planModeWeekly'].forEach(id => {
+    $(id).addEventListener('click', (e) => {
+      e.stopPropagation();
+      planViewMode = id === 'planModeDaily' ? 'daily' : 'weekly';
+      document.querySelectorAll('#planningCalBody .cal-mode-btn').forEach(b => b.classList.remove('active'));
+      $(id).classList.add('active');
+      renderPlanningCalendar();
+    });
+  });
+  $('planModalCancel').addEventListener('click', () => { $('planBarModal').style.display='none'; });
+  $('planBarModal').addEventListener('click', (e) => { if (e.target === $('planBarModal')) $('planBarModal').style.display='none'; });
+}
+
+function buildPlanProjectOptions(selected='') {
+  const opts = ['<option value="">— Pick a project —</option>'];
+  const active = projectsCache.filter(p => p.active!==false && p.status!=='paused');
+  sortItems(active).forEach(p => opts.push(`<option value="${p.id}"${p.id===selected?' selected':''}>${p.code?p.code+' — ':''}${escapeHtml(p.name)}</option>`));
+  (extraCache['aq']||[]).filter(p=>p.active!==false).forEach(p => opts.push(`<option value="${p.id}"${p.id===selected?' selected':''}>AQ: ${escapeHtml(p.name)}</option>`));
+  return opts.join('');
+}
+
+function openPlanModal() { $('planBarModal').style.display='flex'; }
+function closePlanModal() { $('planBarModal').style.display='none'; }
+
+function showPlanAddDialog(uid, startDate, endDate) {
+  const u = allUsersCache.find(x=>x.uid===uid);
+  $('planModalTitle').textContent = `Add bar — ${u?.name||uid}`;
+  $('planModalInfo').textContent  = `${formatDate(startDate)} → ${formatDate(endDate)}`;
+  $('planModalProject').innerHTML = buildPlanProjectOptions();
+  $('planModalPct').value = 100;
+  $('planModalDelete').style.display = 'none';
+  $('planModalSave').onclick = async () => {
+    const projectId = $('planModalProject').value;
+    if (!projectId) return;
+    const pct = Math.max(1, Math.min(200, parseInt($('planModalPct').value)||100));
+    await db.collection('planningBars').add({ userId:uid, projectId, startDate, endDate, percentage:pct, createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+    closePlanModal(); showStamp('Saved');
+  };
+  openPlanModal();
+}
+
+function showPlanEditDialog(bar) {
+  const u = allUsersCache.find(x=>x.uid===bar.userId);
+  $('planModalTitle').textContent = `Edit bar — ${u?.name||bar.userId}`;
+  $('planModalInfo').textContent  = `${formatDate(bar.startDate)} → ${formatDate(bar.endDate)}`;
+  $('planModalProject').innerHTML = buildPlanProjectOptions(bar.projectId);
+  $('planModalPct').value = bar.percentage;
+  $('planModalDelete').style.display = '';
+  $('planModalSave').onclick = async () => {
+    const projectId = $('planModalProject').value;
+    if (!projectId) return;
+    const pct = Math.max(1, Math.min(200, parseInt($('planModalPct').value)||100));
+    await db.collection('planningBars').doc(bar.id).update({ projectId, percentage:pct });
+    closePlanModal(); showStamp('Saved');
+  };
+  $('planModalDelete').onclick = async () => {
+    if (!confirm('Delete this planning bar?')) return;
+    await db.collection('planningBars').doc(bar.id).delete();
+    closePlanModal();
+  };
+  openPlanModal();
+}
+
+function computeBarHours(bar) {
+  const u = allUsersCache.find(x=>x.uid===bar.userId);
+  if (!u || !u.workWeekSchedule?.length) return 0;
+  let hours = 0;
+  const start = new Date(bar.startDate+'T00:00:00'), end = new Date(bar.endDate+'T00:00:00');
+  const holidays = getActiveHolidaysForDates([bar.startDate, bar.endDate]);
+  for (let d=new Date(start); d<=end; d.setDate(d.getDate()+1)) {
+    const ds = toISODate(d);
+    if (holidays[ds]||getClosingDayForDate(ds)) continue;
+    const flex = getFlexHours(ds, u.workWeekSchedule);
+    if (flex && flex>0) hours += flex*(bar.percentage/100);
+  }
+  return Math.round(hours*10)/10;
+}
+
+function setupPlanDrag(cols, mode) {
+  const table = $('planCalTable');
+  if (!table) return;
+  let drag = null;
+
+  const getCell = (el) => { const td=el.closest('[data-plan-uid]'); return td?{uid:td.dataset.planUid, ci:parseInt(td.dataset.planColidx)}:null; };
+  const hiCells = (uid, minCi, maxCi) => {
+    table.querySelectorAll('.plan-cell').forEach(td => {
+      const ci=parseInt(td.dataset.planColidx);
+      td.classList.toggle('plan-drag-hi', td.dataset.planUid===uid && ci>=minCi && ci<=maxCi);
+    });
+  };
+
+  table.addEventListener('mousedown', e => {
+    const info = getCell(e.target); if (!info) return;
+    e.preventDefault();
+    drag = { uid:info.uid, s:info.ci, e:info.ci };
+    hiCells(info.uid, info.ci, info.ci);
+  });
+  table.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const info = getCell(e.target); if (!info||info.uid!==drag.uid) return;
+    drag.e = info.ci;
+    hiCells(drag.uid, Math.min(drag.s,drag.e), Math.max(drag.s,drag.e));
+  });
+  const finishDrag = () => {
+    if (!drag) return;
+    table.querySelectorAll('.plan-drag-hi').forEach(td => td.classList.remove('plan-drag-hi'));
+    const {uid, s, e} = drag; drag = null;
+    const minCi=Math.min(s,e), maxCi=Math.max(s,e);
+    const startDate = mode==='daily' ? cols[minCi].ds : cols[minCi].dates[0];
+    const endDate   = mode==='daily' ? cols[maxCi].ds : cols[maxCi].dates[6];
+    showPlanAddDialog(uid, startDate, endDate);
+  };
+  table.addEventListener('mouseup', finishDrag);
+  window.addEventListener('mouseup', () => { if (drag) { drag=null; table.querySelectorAll('.plan-drag-hi').forEach(td=>td.classList.remove('plan-drag-hi')); } });
+
+  table.addEventListener('click', e => {
+    const barEl = e.target.closest('[data-plan-bar-id]');
+    if (!barEl) return;
+    const bar = planningBarsCache.find(b=>b.id===barEl.dataset.planBarId);
+    if (bar) showPlanEditDialog(bar);
+  });
+}
+
+function renderPlanEmployeeRows(u, cols, calHolidays, viewStart, viewEnd, mode) {
+  const uid = u.uid;
+  const getDateRange = col => mode==='weekly' ? col.dates : [col.ds];
+  const absByDate = {};
+  allAbsencesCache.filter(a=>a.userId===uid).forEach(a=>{ absByDate[a.date]=a.type; });
+  const SHOW_ABS = ['ferielov','feriefridag','day_off'];
+  const ABS_STYLE = { ferielov:{label:'Vacation',bg:'#B0BEC5',text:'#1C313A'}, feriefridag:{label:'Feriefriday',bg:'#D7CCC8',text:'#3E2723'}, day_off:{label:'Day off',bg:'#E0E0E0',text:'#424242'} };
+
+  // Absence intervals
+  const absIvs = [];
+  SHOW_ABS.forEach(absType => {
+    let runS=null;
+    cols.forEach((col,i)=>{ const has=getDateRange(col).some(ds=>absByDate[ds]===absType); if(has){if(runS===null)runS=i;}else if(runS!==null){absIvs.push({s:runS,e:i-1,absType});runS=null;} });
+    if(runS!==null) absIvs.push({s:runS,e:cols.length-1,absType});
+  });
+  const absIvsStyled = absIvs.map(iv=>{ const st=ABS_STYLE[iv.absType]; return {s:iv.s,e:iv.e,name:st.label,bg:st.bg,text:st.text,type:'absence'}; });
+
+  // Planning bar intervals
+  const empBars = planningBarsCache.filter(b=>b.userId===uid&&b.endDate>=viewStart&&b.startDate<=viewEnd);
+  const planIvs = empBars.map(bar=>{
+    let s=cols.length, e=-1;
+    cols.forEach((col,ci)=>{ if(getDateRange(col).some(ds=>ds>=bar.startDate&&ds<=bar.endDate)){s=Math.min(s,ci);e=Math.max(e,ci);} });
+    if(s>e) return null;
+    const proj = projectById(bar.projectId)||(extraCache['aq']||[]).find(p=>p.id===bar.projectId);
+    if(!proj) return null;
+    const color = getProjectBadgeColor(proj)||'#78909C';
+    return {s,e,name:proj.name,bg:color,text:'#fff',barId:bar.id,pct:bar.percentage,type:'plan'};
+  }).filter(Boolean);
+
+  const allIvs = [...planIvs,...absIvsStyled];
+
+  // Compute totals for this view period
+  const barHours = empBars.reduce((sum,bar)=>sum+computeBarHours(bar),0);
+  const schedule = u.workWeekSchedule||[];
+  let availH=0;
+  if(schedule.length) cols.forEach(col=>getDateRange(col).forEach(ds=>{ if(!calHolidays[ds]&&!getClosingDayForDate(ds)){const f=getFlexHours(ds,schedule);if(f&&f>0)availH+=f;} }));
+  const utilPct = availH>0 ? Math.round(barHours/availH*100) : 0;
+  const totalStr = barHours>0 ? `${utilPct}%` : '—';
+  const hoursStr = barHours>0 ? `${trimZeros(barHours)}h` : '—';
+
+  const cellBg = (col, ci) => { const dates=getDateRange(col); const isHol=dates.some(ds=>calHolidays[ds]||getClosingDayForDate(ds)); const isWE=mode==='daily'?col.isWE:false; return isHol?'#EDEEE9':isWE?'var(--line-soft)':''; };
+
+  if(!allIvs.length) {
+    const cells = cols.map((col,ci)=>`<td class="vac-cell plan-cell" data-plan-uid="${uid}" data-plan-colidx="${ci}" style="${cellBg(col,ci)?`background:${cellBg(col,ci)}`:''}" ></td>`).join('');
+    return `<tr><th class="vac-name plan-name">${escapeHtml(u.name)}</th>${cells}<td class="plan-total-cell">${totalStr}</td><td class="plan-total-cell">${hoursStr}</td></tr>`;
+  }
+
+  const layers = packIntervals(allIvs);
+  return layers.map((layer,li)=>{
+    let pos=0, cells='';
+    for(const iv of layer){
+      for(let gi=pos;gi<iv.s;gi++){const col=cols[gi];const bg=cellBg(col,gi);cells+=`<td class="vac-cell plan-cell" data-plan-uid="${uid}" data-plan-colidx="${gi}" style="${bg?`background:${bg}`:''}" ></td>`;}
+      if(iv.type==='plan'){
+        cells+=`<td colspan="${iv.e-iv.s+1}" class="vac-cell gantt-bar-cell plan-bar" style="background:${iv.bg};color:${iv.text}" data-plan-bar-id="${iv.barId}" title="${escapeHtml(iv.name)} — ${iv.pct}%"><span style="font-size:0.62rem;font-weight:600;white-space:nowrap;overflow:hidden;display:block;line-height:1.4">${iv.name.slice(0,10)} <span style="opacity:0.75;font-size:0.58rem">${iv.pct}%</span></span></td>`;
+      } else {
+        cells+=`<td colspan="${iv.e-iv.s+1}" class="vac-cell gantt-bar-cell" style="background:${iv.bg};color:${iv.text}"><span style="font-size:0.62rem;font-weight:600;white-space:nowrap;overflow:hidden;display:block;line-height:1.4">${iv.name}</span></td>`;
+      }
+      pos=iv.e+1;
+    }
+    for(let gi=pos;gi<cols.length;gi++){const col=cols[gi];const bg=cellBg(col,gi);cells+=`<td class="vac-cell plan-cell" data-plan-uid="${uid}" data-plan-colidx="${gi}" style="${bg?`background:${bg}`:''}" ></td>`;}
+    const nameCell=li===0?`<th class="vac-name plan-name" rowspan="${layers.length}">${escapeHtml(u.name)}</th>`:'';
+    const totCells=li===0?`<td class="plan-total-cell" rowspan="${layers.length}">${totalStr}</td><td class="plan-total-cell" rowspan="${layers.length}">${hoursStr}</td>`:'';
+    return `<tr>${nameCell}${cells}${totCells}</tr>`;
+  }).join('');
+}
+
+function renderPlanningCalendar() {
+  const container = $('planningCalContainer');
+  if (!container) return;
+  const employees = allUsersCache.filter(u=>u.active!==false);
+  if (!employees.length) { container.innerHTML='<p class="empty-state">No active employees.</p>'; return; }
+
+  if (planViewMode==='daily') {
+    const m0=planCalDate.getMonth(), y0=planCalDate.getFullYear();
+    const m1=(m0+1)%12, y1=m0===11?y0+1:y0;
+    const days=[];
+    [[y0,m0],[y1,m1]].forEach(([y,m])=>{ const dim=new Date(y,m+1,0).getDate(); for(let d=1;d<=dim;d++){const dt=new Date(y,m,d);const ds=toISODate(dt);const dow=dt.getDay();days.push({ds,d,m,y,isWE:dow===0||dow===6,newMonth:d===1});} });
+    if($('planCalLabel')) $('planCalLabel').textContent=`${new Date(y0,m0).toLocaleString('en',{month:'long'})} – ${new Date(y1,m1).toLocaleString('en',{month:'long',year:'numeric'})}`;
+    const calHolidays=getActiveHolidaysForDates(days.map(d=>d.ds));
+    const viewStart=days[0].ds, viewEnd=days[days.length-1].ds;
+    const months=[]; days.forEach(d=>{if(!months.length||d.m!==months[months.length-1].m)months.push({m:d.m,y:d.y,count:1});else months[months.length-1].count++;});
+    const weekGroups=[]; days.forEach(d=>{const wn=isoWeekNumber(new Date(d.ds+'T00:00:00'));if(!weekGroups.length||weekGroups[weekGroups.length-1].wn!==wn)weekGroups.push({wn,count:1});else weekGroups[weekGroups.length-1].count++;});
+    const monthRow='<tr class="cal-head-row"><th class="vac-name-col plan-name-col"></th>'+months.map(m=>`<th colspan="${m.count}" class="vac-month-header">${new Date(m.y,m.m).toLocaleString('en',{month:'long'}).toUpperCase()} ${m.y}</th>`).join('')+'<th class="plan-total-header" colspan="2">Planned</th></tr>';
+    const weekRowH='<tr class="cal-head-row"><th class="vac-name-col plan-name-col"></th>'+weekGroups.map(w=>`<th colspan="${w.count}" class="vac-col-day">W${w.wn}</th>`).join('')+'<th class="plan-total-header">%</th><th class="plan-total-header">h</th></tr>';
+    const dayRow='<tr class="cal-head-row"><th class="vac-name-col plan-name-col"></th>'+days.map((d,ci)=>`<th class="vac-col-day${d.isWE?' cal-we':''}">${d.d}</th>`).join('')+'<th class="plan-total-header"></th><th class="plan-total-header"></th></tr>';
+    const bodyRows=employees.map(u=>renderPlanEmployeeRows(u,days,calHolidays,viewStart,viewEnd,'daily')).join('');
+    container.innerHTML=`<div class="vac-scroll"><table class="vac-grid plan-grid" id="planCalTable"><thead>${monthRow}${weekRowH}${dayRow}</thead><tbody>${bodyRows}</tbody></table></div>`;
+    setupPlanDrag(days,'daily');
+
+  } else {
+    const startMon=getMonday(planCalDate);
+    const weeks=Array.from({length:26},(_,i)=>{ const mon=addDays(startMon,i*7);const dates=Array.from({length:7},(_,j)=>toISODate(addDays(mon,j)));return{mon,dates,wn:isoWeekNumber(mon),y:mon.getFullYear(),m:mon.getMonth()}; });
+    if($('planCalLabel')){const f=weeks[0].mon;$('planCalLabel').textContent=`W${isoWeekNumber(f)} – W${isoWeekNumber(weeks[weeks.length-1].mon)} · ${f.getFullYear()}`;}
+    const calHolidays=getActiveHolidaysForDates(weeks.flatMap(w=>w.dates));
+    const viewStart=weeks[0].dates[0], viewEnd=weeks[weeks.length-1].dates[6];
+    const months=[]; weeks.forEach(w=>{if(!months.length||w.m!==months[months.length-1].m)months.push({m:w.m,y:w.y,count:1});else months[months.length-1].count++;});
+    const monthRow='<tr class="cal-head-row"><th class="vac-name-col plan-name-col"></th>'+months.map(m=>`<th colspan="${m.count}" class="vac-month-header">${new Date(m.y,m.m).toLocaleString('en',{month:'long'}).toUpperCase()}</th>`).join('')+'<th class="plan-total-header" colspan="2">Planned</th></tr>';
+    const weekRowH='<tr class="cal-head-row"><th class="vac-name-col plan-name-col"></th>'+weeks.map((w,ci)=>`<th class="vac-col-day">W${w.wn}</th>`).join('')+'<th class="plan-total-header">%</th><th class="plan-total-header">h</th></tr>';
+    const bodyRows=employees.map(u=>renderPlanEmployeeRows(u,weeks,calHolidays,viewStart,viewEnd,'weekly')).join('');
+    container.innerHTML=`<div class="vac-scroll"><table class="vac-grid plan-grid" id="planCalTable"><thead>${monthRow}${weekRowH}</thead><tbody>${bodyRows}</tbody></table></div>`;
+    setupPlanDrag(weeks,'weekly');
+  }
 }
 
 function renderVacationCalendar() {
@@ -2410,6 +2657,7 @@ function initExtraTypeCards() {
   // Register all static editor card toggles once here
   [
     ['archivedToggle',            'archivedBody',            'archivedChevron'],
+    ['planningCalToggle',         'planningCalBody',         'planningCalChevron'],
     ['projectTotalsToggle',       'projectTotalsBody',       'projectTotalsChevron'],
     ['allEntriesToggle',          'allEntriesBody',          'allEntriesChevron'],
     ['editorTimesheetToggle',     'editorTimesheetBody',     'editorTimesheetChevron'],

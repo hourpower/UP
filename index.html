@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="fonts.css?v=202608032109" />
-<link rel="stylesheet" href="styles.css?v=202608032109" />
+<link rel="stylesheet" href="fonts.css?v=202608040610" />
+<link rel="stylesheet" href="styles.css?v=202608040610" />
 </head>
 <body>
 
@@ -360,6 +360,43 @@
 
 
       <div class="card">
+        <div class="card-header-row card-toggle" id="planningCalToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Planning Calendar <span class="chevron collapsed" id="planningCalChevron">▾</span></h2>
+          <div class="week-nav" onclick="event.stopPropagation()">
+            <div class="cal-mode-btns">
+              <button class="cal-mode-btn active" id="planModeDaily">Daily</button>
+              <button class="cal-mode-btn" id="planModeWeekly">Weekly</button>
+            </div>
+            <button id="planCalPrevBtn" class="btn btn-ghost" type="button">‹</button>
+            <span id="planCalLabel" class="week-label"></span>
+            <button id="planCalNextBtn" class="btn btn-ghost" type="button">›</button>
+            <button id="planCalTodayBtn" class="btn btn-ghost" type="button">This month</button>
+          </div>
+        </div>
+        <div id="planningCalBody" class="collapsible-body hidden">
+          <p style="font-size:0.8rem;color:var(--ink-soft);padding:0 24px 8px">Drag across cells to add a planning bar. Click a bar to edit or delete it.</p>
+          <div id="planningCalContainer"></div>
+        </div>
+      </div>
+
+      <!-- Planning bar modal -->
+      <div id="planBarModal" class="modal-overlay" style="display:none">
+        <div class="modal-box">
+          <h3 id="planModalTitle">Planning bar</h3>
+          <p id="planModalInfo" style="color:var(--ink-soft);font-size:0.85rem;margin:4px 0 16px"></p>
+          <label style="display:block;margin-bottom:4px;font-size:0.82rem;font-weight:600">Project</label>
+          <select id="planModalProject" style="width:100%;margin-bottom:12px"></select>
+          <label style="display:block;margin-bottom:4px;font-size:0.82rem;font-weight:600">Allocation %</label>
+          <input type="number" id="planModalPct" min="1" max="200" value="100" style="width:100px;margin-bottom:16px">
+          <div style="display:flex;gap:8px">
+            <button id="planModalSave" class="btn btn-primary">Save</button>
+            <button id="planModalDelete" class="btn btn-ghost" style="display:none;color:var(--danger)">Delete</button>
+            <button id="planModalCancel" class="btn btn-ghost">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
         <div class="card-header-row card-toggle" id="vacationToggle" role="button" tabindex="0" aria-expanded="true">
           <h2>Employee Calendar <span class="chevron" id="vacationChevron">▾</span></h2>
           <div class="week-nav" onclick="event.stopPropagation()">
@@ -483,7 +520,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608032109"></script>
-<script src="app.js?v=202608032109"></script>
+<script src="config.js?v=202608040610"></script>
+<script src="app.js?v=202608040610"></script>
 </body>
 </html>

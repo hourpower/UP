@@ -53,6 +53,10 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isEditor());
     }
+    // Planning bars: editor-only
+    match /planningBars/{barId} {
+      allow read, write: if isEditor();
+    }
     // Timesheet locks: users lock their own weeks, editors can unlock any
     match /timesheetLocks/{lockId} {
       allow read: if isSignedIn();
