@@ -2886,8 +2886,9 @@ function isWeekLocked(uid, weekStartDate) {
   const lockId = `${uid}_${toISODate(weekStartDate)}`;
   return timesheetLocksCache.some(l => l.id === lockId);
 }
-$('weekNextBtn').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderWeekGrid(); });
-$('weekTodayBtn').addEventListener('click', () => { weekStart = getMonday(new Date()); renderWeekGrid(); });
+$('weekPrevBtn').addEventListener('click',  (e) => { e.stopPropagation(); weekStart = addDays(weekStart, -7); renderWeekGrid(); });
+$('weekNextBtn').addEventListener('click',  (e) => { e.stopPropagation(); weekStart = addDays(weekStart,  7); renderWeekGrid(); });
+$('weekTodayBtn').addEventListener('click', (e) => { e.stopPropagation(); weekStart = getMonday(new Date()); renderWeekGrid(); });
 
 $('weekGridTable').addEventListener('click', (e) => {
   const th = e.target.closest('[data-user-sort]');
