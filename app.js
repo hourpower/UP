@@ -3018,7 +3018,7 @@ function renderWeekGrid() {
 
   const holidays = getActiveHolidaysForDates(dateStrs);
 
-  const renderInputRow = (p) => {
+  const renderInputRow = (p, isChild = false) => {
     const isPaused = p.status === 'paused';
     let rowTotal = 0;
     const cells = dateStrs.map((ds, i) => {
@@ -3040,7 +3040,7 @@ function renderWeekGrid() {
           ${disabled ? `disabled title="${title}"` : ''} />
       </td>`;
     }).join('');
-    return `<tr class="${isPaused ? 'proj-paused' : ''}">
+    return `<tr class="${isPaused ? 'proj-paused' : ''}${isChild ? ' project-child-row' : ''}">
       <td class="toggle-col"></td>
       <td class="num-col">${projectCodeBadgeHtml(p)}</td>
       <td>${escapeHtml(p.name)}${isPaused ? ' <span class="paused-badge">Paused</span>' : ''}</td>
@@ -3076,7 +3076,7 @@ function renderWeekGrid() {
           <td class="num row-total">${trimZeros(weekTot)}</td>
           <td class="num row-total">${trimZeros(ytdTot)}</td>
         </tr>`;
-        if (isExpanded) children.forEach(c => { html += renderInputRow(c); });
+        if (isExpanded) children.forEach(c => { html += renderInputRow(c, true); });
       } else {
         html += renderInputRow(p);
       }
