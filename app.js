@@ -30,6 +30,9 @@ console.log('Hour Power app.js loaded — build 202507292300');
 // Lock icons used in submit/unlock UI
 const SVG_LOCK_CLOSED = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16" fill="none" style="vertical-align:-3px;margin-right:5px"><rect x="1" y="7" width="12" height="9" rx="2" fill="#E53935"/><path d="M3.5 7V5C3.5 2.79 5.07 1 7 1C8.93 1 10.5 2.79 10.5 5V7" stroke="#E53935" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="7" cy="11.5" r="1.4" fill="white"/><rect x="6.35" y="11.5" width="1.3" height="2.5" rx="0.65" fill="white"/></svg>`;
 const SVG_LOCK_OPEN   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="16" viewBox="0 0 14 16" fill="none" style="vertical-align:-3px;margin-right:5px"><rect x="1" y="7" width="12" height="9" rx="2" fill="#43A047"/><path d="M3.5 7V4.5C3.5 2.57 5.07 1 7 1C8.93 1 10.5 2.57 10.5 4.5V1" stroke="#43A047" stroke-width="2.2" stroke-linecap="round" fill="none"/><circle cx="7" cy="11.5" r="1.4" fill="white"/><rect x="6.35" y="11.5" width="1.3" height="2.5" rx="0.65" fill="white"/></svg>`;
+const SVG_NOTE_EMPTY  = `<svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 1.5h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4.5L1 13V2.5a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.3"/></svg>`;
+const SVG_NOTE_FILLED = `<svg width="12" height="12" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 1.5h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H4.5L1 13V2.5a1 1 0 0 1 1-1z" fill="var(--accent)" stroke="var(--accent)" stroke-width="1"/></svg>`;
+let allEntriesShowNotes = false;
 
 const $ = (id) => document.getElementById(id);
 
@@ -1813,13 +1816,15 @@ function renderProjectTotals() {
   const showSales  = projectTotalsShowCols.has('sales');
   const showCost   = projectTotalsShowCols.has('cost');
   const showMargin = projectTotalsShowCols.has('margin');
+  const showNotes  = projectTotalsShowCols.has('notes');
 
   // Update table header
   thead.innerHTML = '<th>Employee</th>' +
     (showHours  ? '<th class="num">Hours</th>'       : '') +
     (showSales  ? '<th class="num">Sales price</th>' : '') +
     (showCost   ? '<th class="num">Cost price</th>'  : '') +
-    (showMargin ? '<th class="num">Margin</th>'      : '');
+    (showMargin ? '<th class="num">Margin</th>'      : '') +
+    (showNotes  ? '<th>Notes</th>'                   : '');
 
   const byUser = {};
   allEntriesCache.filter(en =>
@@ -1827,12 +1832,13 @@ function renderProjectTotals() {
     (!from || en.date >= from) &&
     (!to   || en.date <= to)
   ).forEach(en => {
-    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0 };
+    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0, notes: [] };
     const entryProject = projectById(en.projectId);
     const { salesRate, costRate } = resolveProjectRate(entryProject, en.date, en.userId);
     byUser[en.userId].hours += en.hours;
     byUser[en.userId].cost  += en.hours * costRate;
     byUser[en.userId].sales += en.hours * salesRate;
+    if (en.note) byUser[en.userId].notes.push(`${formatDate(en.date)}: ${en.note}`);
   });
 
   const userIds = Object.keys(byUser).sort((a, b) => byUser[a].userName.localeCompare(byUser[b].userName));
@@ -1841,14 +1847,16 @@ function renderProjectTotals() {
 
   let totalHours = 0, totalCost = 0, totalSales = 0;
   tbody.innerHTML = userIds.map(uid => {
-    const { userName, hours, cost, sales } = byUser[uid];
+    const { userName, hours, cost, sales, notes } = byUser[uid];
     totalHours += hours; totalCost += cost; totalSales += sales;
+    const notesHtml = notes.length ? notes.map(n => `<div style="font-size:0.75rem;color:var(--ink-soft)">${escapeHtml(n)}</div>`).join('') : '—';
     return `<tr>
       <td>${escapeHtml(userName)}</td>
       ${showHours  ? `<td class="num">${trimZeros(hours)}</td>` : ''}
       ${showSales  ? `<td class="num">${formatDkk(sales)}</td>` : ''}
       ${showCost   ? `<td class="num">${formatDkk(cost)}</td>`  : ''}
       ${showMargin ? `<td class="num">${formatDkk(sales - cost)}</td>` : ''}
+      ${showNotes  ? `<td>${notesHtml}</td>` : ''}
     </tr>`;
   }).join('');
 
@@ -1858,6 +1866,7 @@ function renderProjectTotals() {
     ${showSales  ? `<td class="num">${formatDkk(totalSales)}</td>` : ''}
     ${showCost   ? `<td class="num">${formatDkk(totalCost)}</td>`  : ''}
     ${showMargin ? `<td class="num">${formatDkk(totalSales - totalCost)}</td>` : ''}
+    ${showNotes  ? `<td></td>` : ''}
   </tr>`;
 
   const _fees = (project && getParentIds().has(project.id))
@@ -2054,6 +2063,17 @@ $('toggleTotalsSummary').addEventListener('click', () => {
   projectTotalsShowSummary = !projectTotalsShowSummary;
   $('toggleTotalsSummary').textContent = `Summary ${projectTotalsShowSummary ? '✓' : '✗'}`;
   renderProjectTotals();
+});
+$('toggleTotalsNotes').addEventListener('click', () => {
+  const on = projectTotalsShowCols.has('notes');
+  on ? projectTotalsShowCols.delete('notes') : projectTotalsShowCols.add('notes');
+  $('toggleTotalsNotes').textContent = `Notes ${on ? '✗' : '✓'}`;
+  renderProjectTotals();
+});
+$('toggleAllEntriesNotes').addEventListener('click', () => {
+  allEntriesShowNotes = !allEntriesShowNotes;
+  $('toggleAllEntriesNotes').textContent = `Notes ${allEntriesShowNotes ? '✓' : '✗'}`;
+  renderAllEntries();
 });
 document.querySelectorAll('.totals-col-toggle').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -3034,10 +3054,19 @@ function renderWeekGrid() {
       const disabled = isPaused || !!absType || locked;
       const dimmed = !!absType;
       const title = isPaused ? 'This project is paused' : locked ? 'Week submitted — contact an editor to unlock' : 'Absence registered for this day';
+      const noteText = en?.note || '';
+      const hasNote  = noteText.length > 0;
+      const canNote  = !!en && !disabled;
       return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}">
-        <input type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*"
-          data-project="${p.id}" data-date="${ds}" value="${en ? trimZeros(en.hours) : ''}"
-          ${disabled ? `disabled title="${title}"` : ''} />
+        <div class="hour-cell-wrap">
+          <input type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*"
+            data-project="${p.id}" data-date="${ds}" value="${en ? trimZeros(en.hours) : ''}"
+            ${disabled ? `disabled title="${title}"` : ''} />
+          <button type="button" class="note-btn${hasNote ? ' has-note' : ''}"
+            data-note-project="${p.id}" data-note-date="${ds}"
+            ${!canNote ? 'disabled' : ''}
+            title="${hasNote ? escapeHtml(noteText) : 'Add note'}">${hasNote ? SVG_NOTE_FILLED : SVG_NOTE_EMPTY}</button>
+        </div>
       </td>`;
     }).join('');
     return `<tr class="${isPaused ? 'proj-paused' : ''}${isChild ? ' project-child-row' : ''}">
@@ -3241,6 +3270,28 @@ function renderWeekGrid() {
 }
 
 $('weekGridBody').addEventListener('click', (e) => {
+  // Note bubble
+  const noteBtn = e.target.closest('.note-btn');
+  if (noteBtn && !noteBtn.disabled) {
+    const projectId = noteBtn.dataset.noteProject;
+    const date      = noteBtn.dataset.noteDate;
+    const en = userEntriesCache.find(x => x.projectId === projectId && x.date === date);
+    if (!en) return;
+    const p = projectsCache.find(x => x.id === projectId) || (extraCache['aq']||[]).find(x=>x.id===projectId);
+    $('noteModalTitle').textContent = `Note — ${formatDate(date)}`;
+    $('noteModalSub').textContent   = p?.name || '';
+    $('noteModalText').value        = en.note || '';
+    $('noteCharCount').textContent  = `${(en.note||'').length}/100`;
+    $('noteModalSave').onclick = async () => {
+      const note = $('noteModalText').value.slice(0, 100);
+      await db.collection('entries').doc(en.id).update({ note });
+      $('noteModal').style.display = 'none';
+      showStamp('Saved');
+    };
+    $('noteModal').style.display = 'flex';
+    setTimeout(() => $('noteModalText').focus(), 50);
+    return;
+  }
   const pid = e.target.dataset.toggleUserParent;
   if (pid) {
     if (userExpandedParents.has(pid)) userExpandedParents.delete(pid);
@@ -3687,6 +3738,10 @@ function renderAbsenceSummary() {
       <td class="num">${r.total ? `<strong>${r.total} d</strong>` : '—'}</td>
     </tr>`).join('');
 }
+$('noteModalCancel').addEventListener('click', () => { $('noteModal').style.display = 'none'; });
+$('noteModal').addEventListener('click', e => { if (e.target === $('noteModal')) $('noteModal').style.display = 'none'; });
+$('noteModalText').addEventListener('input', () => { $('noteCharCount').textContent = `${$('noteModalText').value.length}/100`; });
+
 makeToggle('rateLineToggle', 'rateLinesSections', 'rateLineChevron');
 makeToggle('hoursCardToggle', 'hoursCardBody', 'hoursCardChevron');
 makeToggle('flexToggle', 'flexBody', 'flexChevron');
@@ -3718,6 +3773,11 @@ function renderAllEntries() {
   const from = displayToIso($('filterFrom').value);
   const to = displayToIso($('filterTo').value);
 
+  // Update table header based on notes toggle
+  $('allEntriesTable').querySelector('thead tr').innerHTML =
+    '<th>Date</th><th>Person</th><th>Project</th><th>Client</th><th class="num">Hours</th>' +
+    (allEntriesShowNotes ? '<th>Note</th>' : '') + '<th></th>';
+
   filteredRows = allEntriesCache.filter(en => {
     if (proj && en.projectId !== proj) return false;
     if (user && en.userId !== user) return false;
@@ -3738,10 +3798,9 @@ function renderAllEntries() {
       <td>${codeBadge}${escapeHtml(en.projectName)}</td>
       <td>${escapeHtml(p ? (p.client || '') : '')}</td>
       <td class="num">${en.hours}</td>
-      <td class="note-cell">${escapeHtml(en.note || '')}</td>
+      ${allEntriesShowNotes ? `<td class="note-cell">${escapeHtml(en.note || '')}</td>` : ''}
       <td class="row-actions"><button class="link-btn" data-edit-entry="${en.id}">Edit</button></td>
-    </tr>
-  `;
+    </tr>`;
   }).join('');
 
   const total = filteredRows.reduce((s, en) => s + en.hours, 0);
