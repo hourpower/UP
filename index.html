@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="da">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="fonts.css?v=202608041351" />
-<link rel="stylesheet" href="styles.css?v=202608041351" />
+<link rel="stylesheet" href="fonts.css?v=202608041406" />
+<link rel="stylesheet" href="styles.css?v=202608041406" />
 </head>
 <body>
 
@@ -257,8 +257,8 @@
             <label>Project
               <select id="totalsProjectSelect"><option value="">Choose a project…</option></select>
             </label>
-            <label>From <input type="date" id="totalsFrom" /></label>
-            <label>To   <input type="date" id="totalsTo"   /></label>
+            <label>From <input type="text" id="totalsFrom" placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy"></label>
+            <label>To   <input type="text" id="totalsTo"   placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy"></label>
             <button class="btn btn-ghost" id="totalsThisMonth">This month</button>
             <button class="btn btn-ghost" id="totalsLastMonth">Last month</button>
             <button class="btn btn-ghost" id="totalsThisYear">This year</button>
@@ -313,10 +313,10 @@
               <select id="filterUser"><option value="">Everyone</option></select>
             </label>
             <label>From
-              <input type="date" id="filterFrom" />
+              <input type="text" id="filterFrom" placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy">
             </label>
             <label>To
-              <input type="date" id="filterTo" />
+              <input type="text" id="filterTo" placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy">
             </label>
             <button id="exportCsvBtn" class="btn btn-ghost" type="button">Export CSV</button>
             <button id="exportPdfBtn" class="btn btn-ghost" type="button">Export PDF</button>
@@ -330,7 +330,7 @@
             <form id="entryEditForm" class="edit-entry-form">
               <input type="hidden" id="editEntryId" />
               <label>Date
-                <input type="date" id="editEntryDate" required />
+                <input type="text" id="editEntryDate" required placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy">
               </label>
               <label>Project
                 <select id="editEntryProject" required></select>
@@ -459,8 +459,8 @@
           <!-- Summary section -->
           <h3 class="section-sub-heading">Summary</h3>
           <div class="filters" style="align-items:flex-end;gap:12px">
-            <label>From <input type="date" id="absFromDate" /></label>
-            <label>To   <input type="date" id="absToDate"   /></label>
+            <label>From <input type="text" id="absFromDate" placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy"></label>
+            <label>To   <input type="text" id="absToDate"   placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy"></label>
             <button class="btn btn-ghost" id="absThisYear">This year</button>
             <button class="btn btn-ghost" id="absLastYear">Last year</button>
             <button class="btn btn-ghost" id="absAllTime">All time</button>
@@ -484,7 +484,7 @@
           <div class="stacked-form" style="margin-top:16px;max-width:200px">
             <h4 style="margin:0 0 8px;font-size:0.82rem;font-weight:600">Add office closing day</h4>
             <label>Date
-              <input type="date" id="closingDayDate" style="width:100%;margin-bottom:8px" />
+              <input type="text" id="closingDayDate" style="width:100%;margin-bottom:8px" placeholder="dd-mm-yyyy" / placeholder="dd-mm-yyyy">
             </label>
             <button type="button" id="addClosingDayBtn" class="btn btn-primary" style="width:100%">Add</button>
             <p id="closingDayError" class="empty-state hidden" style="color:#c0392b;margin-top:4px"></p>
@@ -520,7 +520,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608041351"></script>
-<script src="app.js?v=202608041351"></script>
+<script src="config.js?v=202608041406"></script>
+<script src="app.js?v=202608041406"></script>
 </body>
 </html>

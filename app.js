@@ -329,6 +329,28 @@ function getMonday(d) {
   return date;
 }
 
+// Parse a number from user input — accepts both "0,5" (Danish) and "0.5" (English)
+function parseNum(val) {
+  if (val === null || val === undefined || val === '') return NaN;
+  return parseFloat(String(val).trim().replace(',', '.'));
+}
+
+// Date display helpers — always show dd-mm-yyyy in UI
+function isoToDisplay(iso) {
+  if (!iso) return '';
+  const p = iso.split('-');
+  return p.length === 3 ? `${p[2]}-${p[1]}-${p[0]}` : iso;
+}
+function displayToIso(display) {
+  if (!display) return '';
+  const p = display.trim().split(/[-\/\.]/);
+  if (p.length === 3) {
+    if (p[2].length === 4) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    if (p[0].length === 4) return display; // already ISO
+  }
+  return display;
+}
+
 function addDays(d, n) {
   const date = new Date(d);
   date.setDate(date.getDate() + n);
@@ -1464,7 +1486,7 @@ function renderCombinedRateLines(uid, schedKey) {
       </label>`).join('');
     return `
       <div class="work-week-line rate-combo-line">
-        <input type="date" class="ww-date rate-combo-date" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${s.from || ''}" />
+        <input type="text" placeholder="dd-mm-yyyy" class="ww-date rate-combo-date" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}" value="${isoToDisplay(s.from || '')}" />
         ${fieldInputs}
         <span class="ww-unit">${rs.unit}</span>
         <button type="button" class="link-btn link-danger rate-combo-remove" data-uid="${uid}" data-key="${schedKey}" data-idx="${i}">×</button>
@@ -1481,7 +1503,7 @@ async function saveCombinedRateSchedule(uid, schedKey) {
     const entry = { from: fromEl ? fromEl.value : s.from };
     rs.fields.forEach(f => {
       const el = container.querySelector(`.rate-combo-val[data-field="${f.field}"][data-idx="${i}"]`);
-      entry[f.field] = el && el.value !== '' ? parseFloat(el.value) : f.defaultVal;
+      entry[f.field] = el && el.value !== '' ? parseNum(el.value) : f.defaultVal;
     });
     return entry;
   }).filter(e => e.from).sort((a, b) => a.from.localeCompare(b.from));
@@ -1556,7 +1578,7 @@ function renderWorkWeekLines(uid, schedule) {
     return `<p class="work-week-empty">No schedule yet — click + Add to set a working week.</p>`;
   }
   return schedule.map((s, i) => {
-    const total = KEYS.reduce((sum, k) => sum + (parseFloat(s[k]) || 0), 0);
+    const total = KEYS.reduce((sum, k) => sum + (parseNum(s[k]) || 0), 0);
     const dayInputs = KEYS.map((k, di) => `
       <label class="ww-day-label">${DAYS[di]}
         <input type="number" min="0" max="24" step="0.5" class="ww-day rate-input"
@@ -1566,7 +1588,7 @@ function renderWorkWeekLines(uid, schedule) {
     return `
       <div class="work-week-line">
         <div class="ww-row-top">
-          <input type="date" class="ww-date" data-uid="${uid}" data-idx="${i}" value="${s.from || ''}" />
+          <input type="text" placeholder="dd-mm-yyyy" class="ww-date" data-uid="${uid}" data-idx="${i}" value="${isoToDisplay(s.from || '')}" />
           <span class="ww-total-label">= <strong class="ww-total" id="wwtotal-${uid}-${i}">${trimZeros(total)}</strong> hrs/week</span>
           <button type="button" class="link-btn link-danger ww-remove" data-uid="${uid}" data-idx="${i}">×</button>
         </div>
@@ -1601,7 +1623,7 @@ async function saveWorkWeekSchedule(uid) {
     const entry = { from: dateEl ? dateEl.value : s.from };
     KEYS.forEach(k => {
       const el = lines.querySelector(`.ww-day[data-idx="${i}"][data-day="${k}"]`);
-      entry[k] = el && el.value !== '' ? parseFloat(el.value) : (s[k] || 0);
+      entry[k] = el && el.value !== '' ? parseNum(el.value) : (s[k] || 0);
     });
     // Update the live total label
     const total = KEYS.reduce((sum, k) => sum + (entry[k] || 0), 0);
@@ -1764,8 +1786,8 @@ function resolveProjectRate(project, dateStr, uid) {
 
 function renderProjectTotals() {
   const projectId = $('totalsProjectSelect').value;
-  const from = $('totalsFrom').value || null;
-  const to   = $('totalsTo').value   || null;
+  const from = displayToIso($('totalsFrom').value) || null;
+  const to   = displayToIso($('totalsTo').value)   || null;
   const tbody = $('projectTotalsTable').querySelector('tbody');
   const tfoot = $('projectTotalsTable').querySelector('tfoot');
   const thead = $('projectTotalsTable').querySelector('thead tr');
@@ -1861,8 +1883,8 @@ function exportTotalsCsv() {
   const projectId = $('totalsProjectSelect').value;
   if (!projectId) return;
   const project = projectById(projectId);
-  const from = $('totalsFrom').value || null;
-  const to   = $('totalsTo').value   || null;
+  const from = displayToIso($('totalsFrom').value) || null;
+  const to   = displayToIso($('totalsTo').value)   || null;
   const rows = $('projectTotalsTable').querySelectorAll('tbody tr');
   const headers = [...$('projectTotalsTable').querySelectorAll('thead th')].map(th => th.textContent);
   const csv = [
@@ -1880,8 +1902,8 @@ async function exportTotalsPdf() {
   const projectId = $('totalsProjectSelect').value;
   if (!projectId) return;
   const project = projectById(projectId);
-  const from = $('totalsFrom').value || null;
-  const to   = $('totalsTo').value   || null;
+  const from = displayToIso($('totalsFrom').value) || null;
+  const to   = displayToIso($('totalsTo').value)   || null;
   const btn = $('exportTotalsPdfBtn');
   btn.disabled = true; btn.textContent = 'Generating…';
 
@@ -1989,8 +2011,8 @@ async function exportTotalsPdf() {
   }
 }
 $('totalsProjectSelect').addEventListener('change', () => {
-  $('totalsFrom').value = '';
-  $('totalsTo').value   = '';
+  displayToIso($('totalsFrom').value) = '';
+  displayToIso($('totalsTo').value)   = '';
   projectTotalsShowSummary = true;
   $('toggleTotalsSummary').textContent = 'Summary ✓';
   projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
@@ -2005,27 +2027,27 @@ $('totalsFrom').addEventListener('change', renderProjectTotals);
 $('totalsTo').addEventListener('change', renderProjectTotals);
 $('totalsThisYear').addEventListener('click', () => {
   const y = new Date().getFullYear();
-  $('totalsFrom').value = `${y}-01-01`;
-  $('totalsTo').value   = `${y}-12-31`;
+  displayToIso($('totalsFrom').value) = `${y}-01-01`;
+  displayToIso($('totalsTo').value)   = `${y}-12-31`;
   renderProjectTotals();
 });
 $('totalsAllTime').addEventListener('click', () => {
-  $('totalsFrom').value = '';
-  $('totalsTo').value   = '';
+  displayToIso($('totalsFrom').value) = '';
+  displayToIso($('totalsTo').value)   = '';
   renderProjectTotals();
 });
 $('totalsThisMonth').addEventListener('click', () => {
   const n = new Date();
   const y = n.getFullYear(), m = n.getMonth();
-  $('totalsFrom').value = toISODate(new Date(y, m, 1));
-  $('totalsTo').value   = toISODate(new Date(y, m+1, 0));
+  displayToIso($('totalsFrom').value) = toISODate(new Date(y, m, 1));
+  displayToIso($('totalsTo').value)   = toISODate(new Date(y, m+1, 0));
   renderProjectTotals();
 });
 $('totalsLastMonth').addEventListener('click', () => {
   const n = new Date();
   const y = n.getFullYear(), m = n.getMonth() - 1;
-  $('totalsFrom').value = toISODate(new Date(y, m, 1));
-  $('totalsTo').value   = toISODate(new Date(y, m+1, 0));
+  displayToIso($('totalsFrom').value) = toISODate(new Date(y, m, 1));
+  displayToIso($('totalsTo').value)   = toISODate(new Date(y, m+1, 0));
   renderProjectTotals();
 });
 $('toggleTotalsSummary').addEventListener('click', () => {
@@ -2307,7 +2329,7 @@ function buildRateLinesSections(project) {
     const rows = Array.from({ length: RATE_ROW_COUNT }, (_, ri) => {
       const line = userLines[ri] || {};
       return `<tr>
-        <td><input type="date" id="rd_${ui}_${ri}" value="${line.usedFrom || ''}" /></td>
+        <td><input type="text" placeholder="dd-mm-yyyy" id="rd_${ui}_${ri}" value="${line.usedFrom || ''}" /></td>
         <td class="num"><input type="number" min="0" step="1" class="rate-input" id="rs_${ui}_${ri}" value="${line.salesRate != null ? line.salesRate : ''}" /></td>
         <td class="num"><input type="number" min="0" step="1" class="rate-input" id="rc_${ui}_${ri}" value="${line.costRate != null ? line.costRate : ''}" /></td>
       </tr>`;
@@ -2726,7 +2748,7 @@ if ($('editorTimesheetEmployee')) {
     const projectId = input.dataset.project;
     const date      = input.dataset.date;
     const uid       = input.dataset.uid;
-    const raw       = parseFloat(input.value);
+    const raw       = parseNum(input.value);
     const hours     = isNaN(raw) || raw <= 0 ? 0 : raw;
     const u         = allUsersCache.find(x => x.uid === uid);
     const existing  = allEntriesCache.find(en => en.userId === uid && en.projectId === projectId && en.date === date);
@@ -3013,8 +3035,8 @@ function renderWeekGrid() {
       const dimmed = !!absType;
       const title = isPaused ? 'This project is paused' : locked ? 'Week submitted — contact an editor to unlock' : 'Absence registered for this day';
       return `<td class="${i >= 5 ? 'weekend' : ''}${dimmed ? ' absence-dimmed' : ''}">
-        <input type="number" min="0" step="0.25" inputmode="decimal"
-          data-project="${p.id}" data-date="${ds}" value="${en ? en.hours : ''}"
+        <input type="text" inputmode="decimal" pattern="[0-9]*[,.]?[0-9]*"
+          data-project="${p.id}" data-date="${ds}" value="${en ? trimZeros(en.hours) : ''}"
           ${disabled ? `disabled title="${title}"` : ''} />
       </td>`;
     }).join('');
@@ -3265,11 +3287,11 @@ $('weekGridBody').addEventListener('change', async (e) => {
   const date = input.dataset.date;
   const raw = input.value.trim();
 
-  if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) {
+  if (raw !== '' && (isNaN(parseNum(raw)) || parseNum(raw) < 0)) {
     input.value = '';
     return;
   }
-  const hours = raw === '' ? 0 : parseFloat(raw);
+  const hours = raw === '' ? 0 : parseNum(raw);
   const project = projectsCache.find(p => p.id === projectId) ||
     EXTRA_TYPES.flatMap(({ type }) => extraCache[type]).find(p => p.id === projectId);
   const existing = userEntriesCache.find(en => en.projectId === projectId && en.date === date);
@@ -3352,17 +3374,17 @@ $('absenceCardToggle').addEventListener('click', () => {
 
 const absSetThisYear = () => {
   const y = new Date().getFullYear();
-  $('absFromDate').value = `${y}-01-01`;
-  $('absToDate').value   = `${y}-12-31`;
+  displayToIso($('absFromDate').value) = `${y}-01-01`;
+  displayToIso($('absToDate').value)   = `${y}-12-31`;
   renderAbsenceSummary();
 };
 const absSetLastYear = () => {
   const y = new Date().getFullYear() - 1;
-  $('absFromDate').value = `${y}-01-01`;
-  $('absToDate').value   = `${y}-12-31`;
+  displayToIso($('absFromDate').value) = `${y}-01-01`;
+  displayToIso($('absToDate').value)   = `${y}-12-31`;
   renderAbsenceSummary();
 };
-const absSetAllTime  = () => { $('absFromDate').value = ''; $('absToDate').value = ''; renderAbsenceSummary(); };
+const absSetAllTime  = () => { displayToIso($('absFromDate').value) = ''; displayToIso($('absToDate').value) = ''; renderAbsenceSummary(); };
 $('absThisYear').addEventListener('click', absSetThisYear);
 $('absLastYear').addEventListener('click', absSetLastYear);
 $('absAllTime').addEventListener('click', absSetAllTime);
@@ -3394,7 +3416,7 @@ $('absCalAddYear').addEventListener('click', () => {
 });
 
 $('addClosingDayBtn').addEventListener('click', async () => {
-  const date = $('closingDayDate').value;
+  const date = displayToIso($('closingDayDate').value);
   const errEl = $('closingDayError');
   errEl.classList.add('hidden');
 
@@ -3419,7 +3441,7 @@ $('addClosingDayBtn').addEventListener('click', async () => {
     await db.collection('officeCalendar').doc(String(yr)).set(
       { closingDays: newClosing }, { merge: true }
     );
-    $('closingDayDate').value = '';
+    displayToIso($('closingDayDate').value) = '';
     showStamp('Saved');
   } catch (err) {
     errEl.textContent = 'Could not save: ' + err.message;
@@ -3540,7 +3562,7 @@ document.addEventListener('click', async (e) => {
     const row = e.target.closest('tr');
     if (!row) return;
     row.innerHTML = `
-      <td><input type="date" value="${curDate}" id="editHolDate" style="width:130px" /></td>
+      <td><input type="text" placeholder="dd-mm-yyyy" value="${curDate}" id="editHolDate" style="width:130px" /></td>
       <td><input type="text" value="${escapeHtml(curName)}" id="editHolName" style="width:130px" /></td>
       <td></td>
       <td class="row-actions">
@@ -3623,8 +3645,8 @@ document.addEventListener('click', async (e) => {
 });
 
 function renderAbsenceSummary() {
-  const from = $('absFromDate').value || null;
-  const to   = $('absToDate').value   || null;
+  const from = displayToIso($('absFromDate').value) || null;
+  const to   = displayToIso($('absToDate').value)   || null;
 
   const COLS = [
     { value: 'afspad',      label: 'Comp. time off' },
@@ -3693,8 +3715,8 @@ function projectById(id) {
 function renderAllEntries() {
   const proj = $('filterProject').value;
   const user = $('filterUser').value;
-  const from = $('filterFrom').value;
-  const to = $('filterTo').value;
+  const from = displayToIso($('filterFrom').value);
+  const to = displayToIso($('filterTo').value);
 
   filteredRows = allEntriesCache.filter(en => {
     if (proj && en.projectId !== proj) return false;
@@ -3754,7 +3776,7 @@ function openEntryEditPanel(entryId) {
   if (!en) return;
   $('editEntryId').value = en.id;
   $('editEntryPerson').textContent = en.userName;
-  $('editEntryDate').value = en.date;
+  displayToIso($('editEntryDate').value) = en.date;
   $('editEntryHours').value = en.hours;
   $('editEntryNote').value = en.note || '';
   populateEditProjectSelect(en.projectId);
@@ -3782,8 +3804,8 @@ $('entryEditForm').addEventListener('submit', async (e) => {
   const projectId = $('editEntryProject').value;
   const project = projectById(projectId) ||
     EXTRA_TYPES.flatMap(({ type }) => extraCache[type]).find(p => p.id === projectId);
-  const date = $('editEntryDate').value;
-  const hours = parseFloat($('editEntryHours').value);
+  const date = displayToIso($('editEntryDate').value);
+  const hours = parseNum($('editEntryHours').value);
   const note = $('editEntryNote').value.trim();
   if (!id || !projectId || !date || isNaN(hours) || hours < 0) return;
 
@@ -3883,8 +3905,8 @@ $('exportPdfBtn').addEventListener('click', async () => {
       const fu = allUsersCache.find(u => u.uid === fuVal);
       if (fu) filters.push(`Person: ${fu.name}`);
     }
-    if ($('filterFrom').value) filters.push(`From: ${formatDate($('filterFrom').value)}`);
-    if ($('filterTo').value) filters.push(`To: ${formatDate($('filterTo').value)}`);
+    if (displayToIso($('filterFrom').value)) filters.push(`From: ${formatDate(displayToIso($('filterFrom').value))}`);
+    if (displayToIso($('filterTo').value)) filters.push(`To: ${formatDate(displayToIso($('filterTo').value))}`);
 
     doc.setTextColor(...INK);
     doc.setFont('helvetica', 'italic');
