@@ -18,5 +18,7 @@ const firebaseConfig = {
 // Must match the email list in firestore.rules.
 // ============================================================
 const EDITOR_EMAILS = [
-  'info@urbanpower.dk'
+  'info@urbanpower.dk',
+  'sarabjelke@urbanpower.dk',
+  'rv@urbanpower.dk'
 ];
