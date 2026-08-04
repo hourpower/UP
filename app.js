@@ -1534,6 +1534,7 @@ function renderRatesTable() {
           ${EMPLOYEE_TYPES.map(t => `<option value="${t.value}"${u.employeeType === t.value ? ' selected' : ''}>${escapeHtml(t.label)}</option>`).join('')}
         </select>
       </td>
+      <td style="font-size:0.8rem;color:var(--ink-soft)">${escapeHtml(u.email || '—')}</td>
       <td class="row-actions"><button class="link-btn" data-archive-user="${u.uid}">Archive</button></td>
     </tr>
     <tr class="work-week-row">
