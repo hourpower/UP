@@ -166,17 +166,6 @@
 
       <div class="card">
         <div class="card-header-row">
-          <h2>Backup</h2>
-        </div>
-        <div style="padding:0 24px 20px">
-          <p class="access-intro" style="margin:0 0 12px">Downloads a single .zip with everything needed to restore Hour Power: every project, employee, hour entry, rate, absence and calendar setting as JSON files, plus a full copy of the app's own code (so you have it even if this GitHub repo is ever lost).</p>
-          <button id="createBackupBtn" class="btn btn-primary" type="button">⬇ Create Backup</button>
-        </div>
-      </div>
-
-
-      <div class="card">
-        <div class="card-header-row">
           <h2>Projects</h2>
           <button id="newProjectBtn" class="btn btn-primary" type="button">+ New project</button>
         </div>
@@ -516,6 +505,16 @@
             <button type="button" id="addClosingDayBtn" class="btn btn-primary" style="width:100%">Add</button>
             <p id="closingDayError" class="empty-state hidden" style="color:#c0392b;margin-top:4px"></p>
           </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="backupToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Backup <span class="chevron collapsed" id="backupChevron">▾</span></h2>
+        </div>
+        <div id="backupBody" class="collapsible-body hidden" style="padding:0 24px 20px">
+          <p class="access-intro" style="margin:0 0 12px">Downloads a single .zip with everything needed to restore Hour Power: every project, employee, hour entry, rate, absence and calendar setting as JSON files, plus a full copy of the app's own code (so you have it even if this GitHub repo is ever lost).</p>
+          <button id="createBackupBtn" class="btn btn-primary" type="button">⬇ Create Backup</button>
         </div>
       </div>
 

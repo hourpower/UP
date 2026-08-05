@@ -2718,6 +2718,7 @@ function initExtraTypeCards() {
     ['vacationToggle',            'vacationBody',            'vacationChevron'],
     ['absenceCardToggle',         'absenceCardBody',         'absenceCardChevron'],
     ['submittedTimesheetsToggle', 'submittedTimesheetsBody', 'submittedTimesheetsChevron'],
+    ['backupToggle',              'backupBody',              'backupChevron'],
   ].forEach(([t, b, c]) => {
     const el = document.getElementById(t);
     if (el && !el.dataset.toggleBound) {
@@ -4185,13 +4186,21 @@ async function createFullBackup() {
       dataFolder.file(`${name}.json`, JSON.stringify(rows, null, 2));
     }
 
-    // ---- Source: a full copy of the app's own code, fetched from the live site ----
-    const sourceFiles = ['index.html', 'app.js', 'styles.css', 'fonts.css', 'config.js', 'firestore.rules'];
+    // ---- Source: every file in the repo, fetched from the live site ----
+    const sourceFiles = [
+      'index.html', 'app.js', 'styles.css', 'fonts.css', 'config.js', 'firestore.rules',
+      'README.md', 'favicon.png', 'logo.png', 'placeholder.txt',
+      'fonts/MetronicPro-Air.otf', 'fonts/MetronicPro-Light.otf', 'fonts/MetronicPro-Regular.otf',
+      'fonts/MetronicPro-SemiBold.otf', 'fonts/MetronicPro-Bold.otf'
+    ];
+    const binaryExtensions = ['.png', '.jpg', '.jpeg', '.otf', '.ttf', '.woff', '.woff2', '.ico'];
     const sourceFolder = zip.folder('source');
     for (const file of sourceFiles) {
       try {
         const res = await fetch(file, { cache: 'no-cache' });
-        if (res.ok) sourceFolder.file(file, await res.text());
+        if (!res.ok) continue;
+        const isBinary = binaryExtensions.some(ext => file.toLowerCase().endsWith(ext));
+        sourceFolder.file(file, isBinary ? await res.blob() : await res.text());
       } catch { /* skip a file if it can't be fetched */ }
     }
 
@@ -4200,10 +4209,11 @@ async function createFullBackup() {
 Generated: ${new Date().toLocaleString('da-DK')}
 
 /source
-  A full copy of the app's code (index.html, app.js, styles.css, fonts.css,
-  config.js, firestore.rules) exactly as it was live at the time of this backup.
-  To restore: push these files to a GitHub repo with Pages enabled, pointing
-  at a Firebase project set up per README.md.
+  A full copy of every file in the GitHub repo (index.html, app.js, styles.css,
+  fonts.css, config.js, firestore.rules, README.md, favicon.png, logo.png,
+  placeholder.txt, and the fonts/ folder) exactly as it was live at the time
+  of this backup. To restore: push these files to a GitHub repo with Pages
+  enabled, pointing at a Firebase project set up per README.md.
 
 /data
   Every Firestore collection as JSON: users, projects, rates, officeCalendar,
