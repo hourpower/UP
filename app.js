@@ -3792,8 +3792,8 @@ function renderAllEntries() {
   const tbody = $('allEntriesTable').querySelector('tbody');
   $('allEmptyState').classList.toggle('hidden', filteredRows.length > 0);
   tbody.innerHTML = filteredRows.map(en => {
-    const p = projectById(en.projectId);
-    const codeBadge = p && projectCodeBadgeHtml(p);
+    const p = projectById(en.projectId) || (extraCache['aq']||[]).find(x=>x.id===en.projectId) || (extraCache['adm']||[]).find(x=>x.id===en.projectId);
+    const codeBadge = p ? projectCodeBadgeHtml(p) : '';
     return `
     <tr>
       <td>${formatDate(en.date)}</td>
