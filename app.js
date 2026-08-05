@@ -157,7 +157,7 @@ let projectTotalsShowSummary = true;
 let projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
 let editorTimesheetUid = '';
 let editorTsWeekStart  = getMonday(new Date());
-let userExpandedParents = new Set();
+let collapsedSections = new Set(['absence']); // absence collapsed by default
 
 function getParentIds() {
   return new Set(projectsCache.filter(p => p.parentId).map(p => p.parentId).filter(Boolean));
@@ -2155,7 +2155,7 @@ function renderProjectsTable() {
     active
       .filter(p => !p.parentId) // can't make a child a parent
       .filter(p => p.id !== editingProjectId) // can't be own parent
-      .sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name))
+      .sort((a, b) => (b.code || b.name).localeCompare(a.code || a.name, undefined, { numeric: true }))
       .map(p => `<option value="${p.id}">${projectLabelText(p)}</option>`)
       .join('');
   parentSel.value = curParentVal;
@@ -2291,9 +2291,12 @@ $('projectParent').addEventListener('change', () => {
     $('projectClient').value = parent.client || '';
     $('projectCategory').disabled = true;
     $('projectClient').disabled = true;
+    if ($('clientSelect')) { $('clientSelect').value = parent.client || '__new__'; $('clientSelect').disabled = true; }
   } else {
     $('projectCategory').disabled = false;
     $('projectClient').disabled = false;
+    if ($('clientSelect')) $('clientSelect').disabled = false;
+    populateClientSelect($('projectClient').value);
   }
   updateFeeRowVisibility();
 });
@@ -2315,6 +2318,7 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectCategory').disabled = false;
   $('projectClient').value = '';
   $('projectClient').disabled = false;
+  populateClientSelect('');
   $('projectDesc').value = '';
   $('projectExpectedFee').value = '';
   $('projectSubadvisors').value = '';
@@ -2397,7 +2401,7 @@ $('projectForm').addEventListener('submit', async (e) => {
   const name = $('projectName').value.trim();
   const code = $('projectCode').value.trim().slice(0, 10);
   const category = $('projectCategory').value;
-  const client = $('projectClient').value.trim();
+  const client = getClientValue();
   const description = $('projectDesc').value.trim();
   const parentId = $('projectParent').value || null;
   const isParent = editingProjectId && getParentIds().has(editingProjectId);
@@ -2473,11 +2477,13 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectCode').value = p.code || '';
     $('projectCategory').value = p.category || '';
     $('projectClient').value = p.client || '';
+    populateClientSelect(p.client || '');
     // Parent setup
     const parentId = p.parentId || '';
     $('projectParent').value = parentId;
     $('projectCategory').disabled = !!parentId;
     $('projectClient').disabled = !!parentId;
+    if ($('clientSelect')) $('clientSelect').disabled = !!parentId;
     updateFeeRowVisibility();
     $('projectDesc').value = p.description || '';
     $('projectExpectedFee').value = p.expectedFee || '';
@@ -3013,7 +3019,7 @@ function renderWeekGrid() {
   const topLevelProjects = sortUserProjects(activeProjects.filter(p => !p.parentId));
 
   const visibleExtras = EXTRA_TYPES.map(({ type, label }) => ({
-    label,
+    type, label,
     items: sortUserProjects((extraCache[type] || []).filter(p =>
       p.active !== false && isProjectVisibleToCurrentUser(p)
     ))
@@ -3079,9 +3085,21 @@ function renderWeekGrid() {
     </tr>`;
   };
 
+  const sectionHeader = (key, label) => {
+    const isCollapsed = collapsedSections.has(key);
+    return `<tr class="grid-section-header collapsible-section" data-section="${key}">
+      <td colspan="${colspan}" class="section-header-cell">
+        <span class="section-chev">${isCollapsed ? '▶' : '▼'}</span>
+        <span class="section-label">${label}</span>
+      </td>
+    </tr>`;
+  };
+
   const renderProjectsSection = () => {
     if (!topLevelProjects.length) return '';
-    let html = `<tr class="grid-section-header"><td colspan="${colspan}">Projects</td></tr>`;
+    const isCollapsed = collapsedSections.has('projects');
+    let html = sectionHeader('projects', 'Projects');
+    if (isCollapsed) return html;
     topLevelProjects.forEach(p => {
       if (parentIds.has(p.id)) {
         const children = (childrenByParentUser[p.id] || [])
@@ -3113,15 +3131,15 @@ function renderWeekGrid() {
     return html;
   };
 
-  const renderSection = (items, label) => {
+  const renderSection = (items, label, key) => {
     if (!items.length) return '';
-    const header = `<tr class="grid-section-header"><td colspan="${colspan}">${label}</td></tr>`;
-    return header + items.map(renderInputRow).join('');
+    const isCollapsed = collapsedSections.has(key);
+    return sectionHeader(key, label) + (isCollapsed ? '' : items.map(renderInputRow).join(''));
   };
 
   $('weekGridBody').innerHTML =
     renderProjectsSection() +
-    visibleExtras.map(g => renderSection(g.items, g.label)).join('');
+    visibleExtras.map(g => renderSection(g.items, g.label, g.type)).join('');
 
   // Absence row — all employees, options differ by employee type
   const isPermanentUser = currentUser.employeeType === '2';
@@ -3136,9 +3154,9 @@ function renderWeekGrid() {
       `<option value="${t.value}"${a && a.type === t.value ? ' selected' : ''}>${t.label}</option>`).join('');
     return `<td><select class="absence-select" data-date="${ds}" data-type="${a ? a.type : ''}"${locked ? ' disabled title="Week submitted"' : ''}>${opts}</select></td>`;
   }).join('');
-  $('weekGridBody').innerHTML += `
-    <tr class="grid-section-header absence-header"><td colspan="${colspan}">Absence</td></tr>
-    <tr class="absence-row"><td class="toggle-col"></td><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`;
+  const absCollapsed = collapsedSections.has('absence');
+  $('weekGridBody').innerHTML += sectionHeader('absence', 'Absence') +
+    (absCollapsed ? '' : `<tr class="absence-row"><td class="toggle-col"></td><td colspan="2"></td>${absenceCells}<td></td><td></td></tr>`);
 
   // All loggable rows for footer totals (children always included even when collapsed)
   const allLoggable = [
@@ -3273,8 +3291,15 @@ function renderWeekGrid() {
 }
 
 $('weekGridBody').addEventListener('click', (e) => {
-  // Note bubble
-  const noteBtn = e.target.closest('.note-btn');
+  // Section collapse toggle
+  const sectionBtn = e.target.closest('.collapsible-section');
+  if (sectionBtn) {
+    const key = sectionBtn.dataset.section;
+    if (collapsedSections.has(key)) collapsedSections.delete(key);
+    else collapsedSections.add(key);
+    renderWeekGrid();
+    return;
+  }
   if (noteBtn && !noteBtn.disabled) {
     const projectId = noteBtn.dataset.noteProject;
     const date      = noteBtn.dataset.noteDate;
@@ -3502,6 +3527,70 @@ $('addClosingDayBtn').addEventListener('click', async () => {
     errEl.classList.remove('hidden');
   }
 });
+
+function populateClientSelect(currentClient) {
+  const sel = $('clientSelect');
+  const input = $('projectClient');
+  const warn  = $('clientSimilarWarn');
+  if (!sel) return;
+
+  // Gather all unique client names from all projects (incl. archived)
+  const clients = [...new Set(
+    projectsCache.map(p => p.client).filter(c => c && c.trim())
+  )].sort((a, b) => a.localeCompare(b));
+
+  sel.innerHTML = '<option value="__new__">+ New client</option>' +
+    clients.map(c => `<option value="${c}"${c === currentClient ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+
+  // If current value is not in the list, show new-client input pre-filled
+  const isNew = currentClient && !clients.includes(currentClient);
+  if (isNew || !currentClient) {
+    sel.value = '__new__';
+  }
+
+  const toggleNew = () => {
+    const isNewClient = sel.value === '__new__';
+    input.style.display = isNewClient ? '' : 'none';
+    warn.style.display = 'none';
+    if (!isNewClient) input.value = sel.value;
+  };
+
+  sel.onchange = toggleNew;
+  toggleNew();
+
+  // Pre-fill new-client input if editing a non-list client
+  if (isNew) input.value = currentClient;
+
+  // Similarity check on input
+  input.oninput = () => {
+    const val = input.value.trim().toLowerCase();
+    warn.style.display = 'none';
+    if (!val) return;
+    const similar = clients.find(c => {
+      const ex = c.toLowerCase();
+      if (ex === val) return false; // exact match is fine
+      // Check if one contains the other or they share >70% characters
+      if (ex.includes(val) || val.includes(ex)) return true;
+      // Simple character overlap ratio
+      const longer = ex.length > val.length ? ex : val;
+      const shorter = ex.length > val.length ? val : ex;
+      let matches = 0;
+      for (const ch of shorter) if (longer.includes(ch)) matches++;
+      return shorter.length > 3 && matches / shorter.length > 0.8;
+    });
+    if (similar) {
+      warn.textContent = `⚠ Similar to existing client: "${similar}"`;
+      warn.style.display = 'block';
+    }
+  };
+}
+
+function getClientValue() {
+  const sel = $('clientSelect');
+  const input = $('projectClient');
+  if (!sel) return '';
+  return sel.value === '__new__' ? input.value.trim() : sel.value;
+}
 
 function renderAbsenceCard() {
   renderAbsenceSummary();

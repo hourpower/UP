@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Hour Power — Hour Registration</title>
   <link rel="icon" type="image/png" href="favicon.png" />
-<link rel="stylesheet" href="fonts.css?v=202608051229" />
-<link rel="stylesheet" href="styles.css?v=202608051229" />
+<link rel="stylesheet" href="fonts.css?v=202608051431" />
+<link rel="stylesheet" href="styles.css?v=202608051431" />
 </head>
 <body>
 
@@ -197,7 +197,9 @@
               </select>
             </label>
             <label style="flex:3;min-width:0">Client <span class="optional">optional</span>
-              <input type="text" id="projectClient" placeholder="Client name" style="width:100%" />
+              <select id="clientSelect" style="width:100%"></select>
+              <input type="text" id="projectClient" placeholder="New client name…" style="width:100%;margin-top:6px;display:none" autocomplete="off" />
+              <span id="clientSimilarWarn" style="color:#E53935;font-size:0.75rem;display:none;margin-top:2px"></span>
             </label>
           </div>
           <label>Description <span class="optional">optional</span>
@@ -536,7 +538,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
-<script src="config.js?v=202608051229"></script>
-<script src="app.js?v=202608051229"></script>
+<script src="config.js?v=202608051431"></script>
+<script src="app.js?v=202608051431"></script>
 </body>
 </html>
