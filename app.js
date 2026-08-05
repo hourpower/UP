@@ -3154,10 +3154,13 @@ function renderWeekGrid() {
   );
   const grandTotalWeek = dayTotals.reduce((s, n) => s + n, 0);
   const grandTotalYTD  = allLoggable.reduce((sum, p) => sum + ytdHoursForProject(p.id), 0);
-  $('weekGridFoot').innerHTML = `<tr class="totals-row"><td class="toggle-col"></td><td colspan="2">Total</td>` +
+  const totalRowHtml = `<tr class="totals-row grid-top-total"><td class="toggle-col"></td><td colspan="2">Total</td>` +
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
     `<td><span class="foot-num">${trimZeros(grandTotalWeek)}</span></td>` +
     `<td><span class="foot-num">${trimZeros(grandTotalYTD)}</span></td></tr>`;
+  $('weekGridFoot').innerHTML = totalRowHtml;
+  // Also prepend top total row to body
+  $('weekGridBody').innerHTML = totalRowHtml + $('weekGridBody').innerHTML;
 
   // Show/hide and populate the Flex and Vacation cards
   const isPermanent = currentUser.employeeType === '2';
