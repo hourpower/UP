@@ -158,6 +158,7 @@ let projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
 let editorTimesheetUid = '';
 let editorTsWeekStart  = getMonday(new Date());
 let collapsedSections = new Set(['absence']); // absence collapsed by default
+let userExpandedParents = new Set(); // parent projects the current user has expanded in their weekly grid
 
 function getParentIds() {
   return new Set(projectsCache.filter(p => p.parentId).map(p => p.parentId).filter(Boolean));
