@@ -164,6 +164,15 @@
            target="_blank" rel="noopener noreferrer" class="btn btn-ghost">Report bugs ↗</a>
       </div>
 
+      <div class="card">
+        <div class="card-header-row">
+          <h2>Backup</h2>
+        </div>
+        <div style="padding:0 24px 20px">
+          <p class="access-intro" style="margin:0 0 12px">Downloads a single .zip with everything needed to restore Hour Power: every project, employee, hour entry, rate, absence and calendar setting as JSON files, plus a full copy of the app's own code (so you have it even if this GitHub repo is ever lost).</p>
+          <button id="createBackupBtn" class="btn btn-primary" type="button">⬇ Create Backup</button>
+        </div>
+      </div>
 
 
       <div class="card">
@@ -537,6 +546,9 @@
 <!-- PDF export -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Backup export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
 <script src="config.js?v=202608051431"></script>
 <script src="app.js?v=202608051431"></script>

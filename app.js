@@ -4143,3 +4143,92 @@ $('exportCsvBtn').addEventListener('click', () => {
   a.click();
   URL.revokeObjectURL(url);
 });
+// ============================================================
+// Full backup — every Firestore collection + a copy of the app's own source
+// ============================================================
+
+// Recursively converts Firestore Timestamps into plain ISO date strings
+// so the exported JSON is portable and human-readable.
+function serializeFirestoreValue(val) {
+  if (val && typeof val.toDate === 'function') {
+    return val.toDate().toISOString();
+  }
+  if (Array.isArray(val)) return val.map(serializeFirestoreValue);
+  if (val && typeof val === 'object') {
+    const out = {};
+    Object.keys(val).forEach(k => { out[k] = serializeFirestoreValue(val[k]); });
+    return out;
+  }
+  return val;
+}
+
+async function fetchCollectionAsJSON(name) {
+  const snap = await db.collection(name).get();
+  return snap.docs.map(d => serializeFirestoreValue({ id: d.id, ...d.data() }));
+}
+
+async function createFullBackup() {
+  const btn = $('createBackupBtn');
+  if (!btn) return;
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+
+  try {
+    const zip = new JSZip();
+
+    // ---- Data: every collection, one JSON file each ----
+    const collections = ['users', 'projects', 'rates', 'officeCalendar', 'absences', 'planningBars', 'timesheetLocks', 'entries'];
+    const dataFolder = zip.folder('data');
+    for (const name of collections) {
+      const rows = await fetchCollectionAsJSON(name);
+      dataFolder.file(`${name}.json`, JSON.stringify(rows, null, 2));
+    }
+
+    // ---- Source: a full copy of the app's own code, fetched from the live site ----
+    const sourceFiles = ['index.html', 'app.js', 'styles.css', 'fonts.css', 'config.js', 'firestore.rules'];
+    const sourceFolder = zip.folder('source');
+    for (const file of sourceFiles) {
+      try {
+        const res = await fetch(file, { cache: 'no-cache' });
+        if (res.ok) sourceFolder.file(file, await res.text());
+      } catch { /* skip a file if it can't be fetched */ }
+    }
+
+    zip.file('README.txt',
+`Hour Power — Full Backup
+Generated: ${new Date().toLocaleString('da-DK')}
+
+/source
+  A full copy of the app's code (index.html, app.js, styles.css, fonts.css,
+  config.js, firestore.rules) exactly as it was live at the time of this backup.
+  To restore: push these files to a GitHub repo with Pages enabled, pointing
+  at a Firebase project set up per README.md.
+
+/data
+  Every Firestore collection as JSON: users, projects, rates, officeCalendar,
+  absences, planningBars, timesheetLocks, entries. To restore into a fresh
+  Firebase project, import each JSON file into the matching Firestore
+  collection (e.g. with a short script using the Firebase Admin SDK).
+
+Keep this file somewhere safe — it contains all of your company's data,
+including employee rates.
+`);
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hourpower-backup-${new Date().toISOString().slice(0, 10)}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showStamp('Backup downloaded');
+  } catch (err) {
+    alert('Backup failed: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+$('createBackupBtn').addEventListener('click', createFullBackup);
