@@ -222,7 +222,7 @@ const PROJECT_PALETTES = {
   architecture:  ['#B71C1C','#C0392B','#D84315','#BF360C','#6D4C41','#880E4F','#AD1457','#8B0000','#A52714','#7B241C'],
   publicspace:   ['#1B5E20','#2E7D32','#00695C','#004D40','#145A32','#0B5345','#0D6B3C','#117864','#1D6A39','#196F3D'],
   urbanplanning: ['#0D47A1','#1565C0','#01579B','#0277BD','#283593','#1A237E','#303F9F','#0A3D62','#1B4F72','#154360'],
-  other:         ['#546E7A','#455A64','#37474F','#607D8B','#78909C','#616161','#757575','#424242','#263238','#90A4AE']
+  other:         ['#EFE0CE','#F2E6D0','#E8D5B8','#F0E2C8','#E3D0B5','#EDDBC0','#F5EAD8','#E6D3B0','#DFCBA8','#EADAC0']
 };
 const PROJECT_CATEGORY_LABELS = {
   architecture:  'Architecture',
@@ -258,6 +258,22 @@ function getProjectBadgeColor(project, _visited = new Set()) {
 
   const idx = prefixes.indexOf(prefix);
   return idx >= 0 ? palette[idx % palette.length] : palette[0];
+}
+
+// Resolves a project's effective category, following parent inheritance the
+// same way getProjectBadgeColor does — needed so badge text stays readable
+// against the (now light) "other" palette while staying white on the rest.
+function getProjectCategoryResolved(project, _visited = new Set()) {
+  if (_visited.has(project.id)) return project.category || 'other';
+  _visited.add(project.id);
+  if (project.parentId) {
+    const parent = projectsCache.find(p => p.id === project.parentId);
+    if (parent) return getProjectCategoryResolved(parent, _visited);
+  }
+  return project.category || 'other';
+}
+function getProjectBadgeTextColor(project) {
+  return getProjectCategoryResolved(project) === 'other' ? '#4E342E' : '#fff';
 }
 const RATE_SCHEDULES = {
   rate: {
@@ -810,7 +826,7 @@ function isProjectVisibleToCurrentUser(p) {
 function projectCodeBadgeHtml(p) {
   if (!p.code) return '';
   const color = (p.type || 'project') === 'project' ? getProjectBadgeColor(p) : null;
-  const style = color ? ` style="background:${color};color:#fff"` : '';
+  const style = color ? ` style="background:${color};color:${getProjectBadgeTextColor(p)}"` : '';
   return `<span class="proj-code"${style}>${escapeHtml(p.code)}</span>`;
 }
 
@@ -955,7 +971,7 @@ $('vacationToggle').addEventListener('click', () => {
 
 const EXTRA_TYPE_COLORS = {
   adm: { bg: '#E8D5B0', text: '#5D4037' },
-  aq:  { bg: '#FFD740', text: '#5D4037' }
+  aq:  { bg: '#FFE9B8', text: '#5D4037' }
 };
 
 function findProjectAnywhere(id) {
@@ -1129,7 +1145,7 @@ function renderPlanEmployeeRows(u, cols, calHolidays, viewStart, viewEnd, mode) 
     const proj = projectById(bar.projectId)||(extraCache['aq']||[]).find(p=>p.id===bar.projectId);
     if(!proj) return null;
     const color = getProjectBadgeColor(proj)||'#78909C';
-    return {s,e,name:proj.name,bg:color,text:'#fff',barId:bar.id,pct:bar.percentage,type:'plan'};
+    return {s,e,name:proj.name,bg:color,text:getProjectBadgeTextColor(proj),barId:bar.id,pct:bar.percentage,type:'plan'};
   }).filter(Boolean);
 
   const allIvs = [...planIvs,...absIvsStyled];
@@ -1264,7 +1280,7 @@ function renderVacationCalendar() {
         const dates = dateFn ? dateFn(col) : [col.ds];
         return dates.reduce((s, ds) => s + (hoursLookup[uid]?.[ds]?.[iv.pid]||0), 0);
       }).reduce((a,b)=>a+b,0);
-      const c = proj._extraType ? (EXTRA_TYPE_COLORS[proj._extraType]||{bg:'#B0BEC5',text:'#263238'}) : { bg: getProjectBadgeColor(proj)||'#78909C', text:'#fff' };
+      const c = proj._extraType ? (EXTRA_TYPE_COLORS[proj._extraType]||{bg:'#B0BEC5',text:'#263238'}) : { bg: getProjectBadgeColor(proj)||'#78909C', text: getProjectBadgeTextColor(proj) };
       return { s:iv.s, e:iv.e, name:proj.name, bg:c.bg, text:c.text, priority, totalHours };
     }).filter(Boolean);
   };
