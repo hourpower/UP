@@ -3302,6 +3302,7 @@ $('weekGridBody').addEventListener('click', (e) => {
     renderWeekGrid();
     return;
   }
+  const noteBtn = e.target.closest('.note-btn');
   if (noteBtn && !noteBtn.disabled) {
     const projectId = noteBtn.dataset.noteProject;
     const date      = noteBtn.dataset.noteDate;
