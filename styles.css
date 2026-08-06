@@ -1221,3 +1221,41 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .section-header-cell { position: relative; padding-right: 12px !important; }
 .section-chev { position: absolute; left: 8px; font-size: 0.65rem; color: var(--ink-soft); top: 50%; transform: translateY(-50%); }
 .section-label { display: block; text-align: left; padding-left: 18px; }
+
+/* ==========================================================
+   Mini date picker (shared popup for every dd-mm-yyyy field)
+   ========================================================== */
+.mini-date-picker {
+  position: fixed;
+  z-index: 1100;
+  width: 220px;
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px;
+  font-size: 0.85rem;
+}
+.mini-date-picker.hidden { display: none; }
+.mdp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.mdp-label { font-weight: 600; color: var(--ink); }
+.mdp-nav {
+  background: none; border: none; cursor: pointer; color: var(--ink-soft);
+  font-size: 1rem; line-height: 1; padding: 2px 6px; border-radius: 4px;
+}
+.mdp-nav:hover { background: var(--accent-soft); color: var(--accent-dark); }
+.mdp-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  text-align: center; color: var(--ink-soft); font-size: 0.72rem; margin-bottom: 2px;
+}
+.mdp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.mdp-cell {
+  background: none; border: none; cursor: pointer; padding: 4px 0;
+  border-radius: 4px; color: var(--ink); font-size: 0.8rem;
+}
+.mdp-cell:hover { background: var(--accent-soft); color: var(--accent-dark); }
+.mdp-cell.mdp-empty { cursor: default; }
+.mdp-cell.mdp-empty:hover { background: none; }
+.mdp-cell.mdp-today { font-weight: 700; color: var(--accent-dark); }
+.mdp-cell.mdp-selected { background: var(--accent); color: #fff; }
+.mdp-cell.mdp-selected:hover { background: var(--accent-dark); color: #fff; }

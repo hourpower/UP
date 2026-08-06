@@ -1504,7 +1504,7 @@ async function saveCombinedRateSchedule(uid, schedKey) {
   if (!container) return;
   const schedule = ((ratesCache[uid] || {})[schedKey] || []).map((s, i) => {
     const fromEl = container.querySelector(`.rate-combo-date[data-idx="${i}"]`);
-    const entry = { from: fromEl ? fromEl.value : s.from };
+    const entry = { from: fromEl ? displayToIso(fromEl.value) : s.from };
     rs.fields.forEach(f => {
       const el = container.querySelector(`.rate-combo-val[data-field="${f.field}"][data-idx="${i}"]`);
       entry[f.field] = el && el.value !== '' ? parseNum(el.value) : f.defaultVal;
@@ -1624,7 +1624,7 @@ async function saveWorkWeekSchedule(uid) {
   const KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const schedule = (u.workWeekSchedule || []).map((s, i) => {
     const dateEl = lines.querySelector(`.ww-date[data-idx="${i}"]`);
-    const entry = { from: dateEl ? dateEl.value : s.from };
+    const entry = { from: dateEl ? displayToIso(dateEl.value) : s.from };
     KEYS.forEach(k => {
       const el = lines.querySelector(`.ww-day[data-idx="${i}"][data-day="${k}"]`);
       entry[k] = el && el.value !== '' ? parseNum(el.value) : (s[k] || 0);
@@ -2354,7 +2354,7 @@ function buildRateLinesSections(project) {
     const rows = Array.from({ length: RATE_ROW_COUNT }, (_, ri) => {
       const line = userLines[ri] || {};
       return `<tr>
-        <td><input type="text" placeholder="dd-mm-yyyy" id="rd_${ui}_${ri}" value="${line.usedFrom || ''}" /></td>
+        <td><input type="text" placeholder="dd-mm-yyyy" id="rd_${ui}_${ri}" value="${isoToDisplay(line.usedFrom || '')}" /></td>
         <td class="num"><input type="number" min="0" step="1" class="rate-input" id="rs_${ui}_${ri}" value="${line.salesRate != null ? line.salesRate : ''}" /></td>
         <td class="num"><input type="number" min="0" step="1" class="rate-input" id="rc_${ui}_${ri}" value="${line.costRate != null ? line.costRate : ''}" /></td>
       </tr>`;
@@ -2379,7 +2379,7 @@ function readPerUserRateLines() {
     for (let ri = 0; ri < RATE_ROW_COUNT; ri++) {
       const dateEl = document.getElementById(`rd_${ui}_${ri}`);
       if (!dateEl) continue;
-      const usedFrom = dateEl.value;
+      const usedFrom = displayToIso(dateEl.value);
       if (!usedFrom) continue;
       const salesRaw = document.getElementById(`rs_${ui}_${ri}`).value.trim();
       const costRaw  = document.getElementById(`rc_${ui}_${ri}`).value.trim();
@@ -3466,7 +3466,7 @@ const absSetLastYear = () => {
   $('absToDate').value   = isoToDisplay(`${y}-12-31`);
   renderAbsenceSummary();
 };
-const absSetAllTime  = () => { displayToIso($('absFromDate').value) = ''; displayToIso($('absToDate').value) = ''; renderAbsenceSummary(); };
+const absSetAllTime  = () => { $('absFromDate').value = ''; $('absToDate').value = ''; renderAbsenceSummary(); };
 $('absThisYear').addEventListener('click', absSetThisYear);
 $('absLastYear').addEventListener('click', absSetLastYear);
 $('absAllTime').addEventListener('click', absSetAllTime);
@@ -3708,7 +3708,7 @@ document.addEventListener('click', async (e) => {
     const row = e.target.closest('tr');
     if (!row) return;
     row.innerHTML = `
-      <td><input type="text" placeholder="dd-mm-yyyy" value="${curDate}" id="editHolDate" style="width:130px" /></td>
+      <td><input type="text" placeholder="dd-mm-yyyy" value="${isoToDisplay(curDate)}" id="editHolDate" style="width:130px" /></td>
       <td><input type="text" value="${escapeHtml(curName)}" id="editHolName" style="width:130px" /></td>
       <td></td>
       <td class="row-actions">
@@ -3722,7 +3722,7 @@ document.addEventListener('click', async (e) => {
   if (e.target.id === 'saveHolEdit') {
     const origDate = e.target.dataset.origDate;
     const year = e.target.dataset.year;
-    const newDate = document.getElementById('editHolDate').value;
+    const newDate = displayToIso(document.getElementById('editHolDate').value);
     const newName = document.getElementById('editHolName').value.trim();
     const { holidayOverrides } = getYearCalendar(year);
     const overrides = { ...holidayOverrides, [origDate]: { date: newDate || origDate, name: newName } };
@@ -4243,3 +4243,113 @@ including employee rates.
 }
 
 $('createBackupBtn').addEventListener('click', createFullBackup);
+
+// ============================================================
+// Date fields: type-8-digits auto-formatting + shared mini calendar picker
+// Applies to every input[placeholder="dd-mm-yyyy"] in the app, static or
+// dynamically rendered — no per-field wiring needed.
+// ============================================================
+
+const DATE_FIELD_SELECTOR = 'input[placeholder="dd-mm-yyyy"]';
+
+// As the user types digits, auto-insert dashes: 22012026 -> 22-01-2026.
+// Runs on paste too since it's driven by the resulting value, not keystrokes.
+document.addEventListener('input', (e) => {
+  if (!e.target.matches || !e.target.matches(DATE_FIELD_SELECTOR)) return;
+  const el = e.target;
+  const digits = el.value.replace(/\D/g, '').slice(0, 8);
+  let formatted = digits;
+  if (digits.length > 4) formatted = `${digits.slice(0, 2)}-${digits.slice(2, 4)}-${digits.slice(4)}`;
+  else if (digits.length > 2) formatted = `${digits.slice(0, 2)}-${digits.slice(2)}`;
+  if (el.value !== formatted) el.value = formatted;
+});
+
+// ---- Mini calendar picker ----
+let mdpActiveInput = null;
+let mdpViewDate = new Date();
+
+function positionMiniDatePicker(input) {
+  const popup = $('miniDatePicker');
+  const rect = input.getBoundingClientRect();
+  const popupWidth = popup.offsetWidth || 220;
+  const popupHeight = popup.offsetHeight || 240;
+  let top = rect.bottom + 6;
+  let left = rect.left;
+  if (left + popupWidth > window.innerWidth - 8) left = window.innerWidth - popupWidth - 8;
+  if (top + popupHeight > window.innerHeight - 8) top = rect.top - popupHeight - 6;
+  popup.style.top = `${Math.max(8, top)}px`;
+  popup.style.left = `${Math.max(8, left)}px`;
+}
+
+function renderMiniDatePicker() {
+  const y = mdpViewDate.getFullYear();
+  const m = mdpViewDate.getMonth();
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  $('mdpLabel').textContent = `${monthNames[m]} ${y}`;
+
+  const firstOfMonth = new Date(y, m, 1);
+  const startOffset = (firstOfMonth.getDay() + 6) % 7; // Monday-first grid
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+  const selectedIso = mdpActiveInput ? displayToIso(mdpActiveInput.value) : '';
+  const todayIso = toISODate(new Date());
+
+  let cells = '';
+  for (let i = 0; i < startOffset; i++) cells += `<span class="mdp-cell mdp-empty"></span>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isSelected = iso === selectedIso;
+    const isToday = iso === todayIso;
+    cells += `<button type="button" class="mdp-cell${isSelected ? ' mdp-selected' : ''}${isToday ? ' mdp-today' : ''}" data-iso="${iso}">${d}</button>`;
+  }
+  $('mdpGrid').innerHTML = cells;
+}
+
+function openMiniDatePicker(input) {
+  mdpActiveInput = input;
+  const iso = displayToIso(input.value);
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + 'T00:00:00') : new Date();
+  mdpViewDate = isNaN(parsed) ? new Date() : parsed;
+  renderMiniDatePicker();
+  $('miniDatePicker').classList.remove('hidden');
+  positionMiniDatePicker(input);
+}
+
+function closeMiniDatePicker() {
+  $('miniDatePicker').classList.add('hidden');
+  mdpActiveInput = null;
+}
+
+$('mdpPrev').addEventListener('click', () => {
+  mdpViewDate = new Date(mdpViewDate.getFullYear(), mdpViewDate.getMonth() - 1, 1);
+  renderMiniDatePicker();
+});
+$('mdpNext').addEventListener('click', () => {
+  mdpViewDate = new Date(mdpViewDate.getFullYear(), mdpViewDate.getMonth() + 1, 1);
+  renderMiniDatePicker();
+});
+$('mdpGrid').addEventListener('click', (e) => {
+  const cell = e.target.closest('.mdp-cell:not(.mdp-empty)');
+  if (!cell || !mdpActiveInput) return;
+  mdpActiveInput.value = isoToDisplay(cell.dataset.iso);
+  mdpActiveInput.dispatchEvent(new Event('input', { bubbles: true }));
+  mdpActiveInput.dispatchEvent(new Event('change', { bubbles: true }));
+  closeMiniDatePicker();
+});
+
+document.addEventListener('focusin', (e) => {
+  if (e.target.matches && e.target.matches(DATE_FIELD_SELECTOR) && !e.target.disabled) {
+    openMiniDatePicker(e.target);
+  }
+});
+document.addEventListener('mousedown', (e) => {
+  const popup = $('miniDatePicker');
+  if (popup.classList.contains('hidden')) return;
+  if (e.target === mdpActiveInput || popup.contains(e.target)) return;
+  closeMiniDatePicker();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && mdpActiveInput) closeMiniDatePicker();
+});
+window.addEventListener('scroll', () => { if (mdpActiveInput) closeMiniDatePicker(); }, true);
+window.addEventListener('resize', () => { if (mdpActiveInput) closeMiniDatePicker(); });

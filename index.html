@@ -530,6 +530,17 @@
     </section>
 
   </main>
+
+  <!-- Shared mini date picker popup, used by every dd-mm-yyyy field -->
+  <div id="miniDatePicker" class="mini-date-picker hidden">
+    <div class="mdp-header">
+      <button type="button" class="mdp-nav" id="mdpPrev">‹</button>
+      <span id="mdpLabel" class="mdp-label"></span>
+      <button type="button" class="mdp-nav" id="mdpNext">›</button>
+    </div>
+    <div class="mdp-weekdays"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+    <div class="mdp-grid" id="mdpGrid"></div>
+  </div>
   <footer class="app-footer">
     <span id="appUpdateNotice">–</span>
   </footer>
