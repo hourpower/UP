@@ -1858,7 +1858,6 @@ function renderProjectTotals() {
     ? projectsCache.filter(p => p.parentId === projectId).map(p => p.id)
     : [projectId];
 
-  const sh = projectTotalsShowCols.has;
   const showHours     = projectTotalsShowCols.has('hours');
   const showSales     = projectTotalsShowCols.has('sales');
   const showSalesRate = projectTotalsShowCols.has('salesRate');
@@ -1867,15 +1866,16 @@ function renderProjectTotals() {
   const showMargin    = projectTotalsShowCols.has('margin');
   const showNotes     = projectTotalsShowCols.has('notes');
 
-  // Update table header
-  thead.innerHTML = '<th>Employee</th>' +
-    (showHours     ? '<th class="num">Hours</th>'            : '') +
-    (showSales     ? '<th class="num">Sales price</th>'      : '') +
-    (showSalesRate ? '<th class="num">Sales rate (DKK/h)</th>' : '') +
-    (showCost      ? '<th class="num">Cost price</th>'       : '') +
-    (showCostRate  ? '<th class="num">Cost rate (DKK/h)</th>'  : '') +
-    (showMargin    ? '<th class="num">Margin</th>'           : '') +
-    (showNotes     ? '<th>Notes</th>'                        : '');
+  // Update table header — column widths are driven by these classes (not
+  // position), so toggling/reordering columns never throws alignment off.
+  thead.innerHTML = '<th class="col-employee">Employee</th>' +
+    (showHours     ? '<th class="num col-hours">Hours</th>'              : '') +
+    (showSalesRate ? '<th class="num col-rate">Sales rate (DKK/h)</th>'  : '') +
+    (showSales     ? '<th class="num col-price">Sales price</th>'       : '') +
+    (showCostRate  ? '<th class="num col-rate">Cost rate (DKK/h)</th>'   : '') +
+    (showCost      ? '<th class="num col-price">Cost price</th>'        : '') +
+    (showMargin    ? '<th class="num col-price">Margin</th>'            : '') +
+    (showNotes     ? '<th class="col-notes">Notes</th>'                 : '');
 
   const byUser = {};
   allEntriesCache.filter(en =>
@@ -1913,26 +1913,27 @@ function renderProjectTotals() {
     totalHours += hours; totalCost += cost; totalSales += sales;
     const notesHtml = notes.length ? notes.map(n => `<div style="font-size:0.75rem;color:var(--ink-soft)">${escapeHtml(n)}</div>`).join('') : '—';
     return `<tr>
-      <td>${escapeHtml(userName)}</td>
-      ${showHours     ? `<td class="num">${trimZeros(hours)}</td>` : ''}
-      ${showSales     ? `<td class="num">${formatDkk(sales)}</td>` : ''}
-      ${showSalesRate ? `<td class="num">${formatRateRange(salesRates)}</td>` : ''}
-      ${showCost      ? `<td class="num">${formatDkk(cost)}</td>`  : ''}
-      ${showCostRate  ? `<td class="num">${formatRateRange(costRates)}</td>` : ''}
-      ${showMargin    ? `<td class="num">${formatDkk(sales - cost)}</td>` : ''}
-      ${showNotes     ? `<td>${notesHtml}</td>` : ''}
+      <td class="col-employee">${escapeHtml(userName)}</td>
+      ${showHours     ? `<td class="num col-hours">${trimZeros(hours)}</td>` : ''}
+      ${showSalesRate ? `<td class="num col-rate">${formatRateRange(salesRates)}</td>` : ''}
+      ${showSales     ? `<td class="num col-price">${formatDkk(sales)}</td>` : ''}
+      ${showCostRate  ? `<td class="num col-rate">${formatRateRange(costRates)}</td>` : ''}
+      ${showCost      ? `<td class="num col-price">${formatDkk(cost)}</td>`  : ''}
+      ${showMargin    ? `<td class="num col-price">${formatDkk(sales - cost)}</td>` : ''}
+      ${showNotes     ? `<td class="col-notes">${notesHtml}</td>` : ''}
     </tr>`;
   }).join('');
 
   tfoot.innerHTML = `<tr class="totals-row">
-    <td>Total</td>
-    ${showHours     ? `<td class="num">${trimZeros(totalHours)}</td>` : ''}
-    ${showSales     ? `<td class="num">${formatDkk(totalSales)}</td>` : ''}
-    ${showSalesRate ? `<td class="num">—</td>` : ''}
-    ${showCost      ? `<td class="num">${formatDkk(totalCost)}</td>`  : ''}
-    ${showCostRate  ? `<td class="num">—</td>` : ''}
-    ${showMargin    ? `<td class="num">${formatDkk(totalSales - totalCost)}</td>` : ''}
-    ${showNotes     ? `<td></td>` : ''}
+    <td class="col-employee">Total</td>
+    ${showHours     ? `<td class="num col-hours">${trimZeros(totalHours)}</td>` : ''}
+    ${showSalesRate ? `<td class="num col-rate">—</td>` : ''}
+    ${showSales     ? `<td class="num col-price">${formatDkk(totalSales)}</td>` : ''}
+    ${showCostRate  ? `<td class="num col-rate">—</td>` : ''}
+    ${showCost      ? `<td class="num col-price">${formatDkk(totalCost)}</td>`  : ''}
+    ${showMargin    ? `<td class="num col-price">${formatDkk(totalSales - totalCost)}</td>` : ''}
+    ${showNotes     ? `<td class="col-notes"></td>` : ''}
+
   </tr>`;
 
   const _fees = (project && getParentIds().has(project.id))
@@ -2052,10 +2053,10 @@ async function exportTotalsPdf() {
     // Build table columns based on visibility
     const colHeaders = ['Employee'];
     if (projectTotalsShowCols.has('hours'))     colHeaders.push('Hours');
-    if (projectTotalsShowCols.has('sales'))     colHeaders.push('Sales price');
     if (projectTotalsShowCols.has('salesRate')) colHeaders.push('Sales rate (DKK/h)');
-    if (projectTotalsShowCols.has('cost'))      colHeaders.push('Cost price');
+    if (projectTotalsShowCols.has('sales'))     colHeaders.push('Sales price');
     if (projectTotalsShowCols.has('costRate'))  colHeaders.push('Cost rate (DKK/h)');
+    if (projectTotalsShowCols.has('cost'))      colHeaders.push('Cost price');
     if (projectTotalsShowCols.has('margin'))    colHeaders.push('Margin');
 
     const tableRows = [...$('projectTotalsTable').querySelectorAll('tbody tr')].map(tr =>

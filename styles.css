@@ -1151,24 +1151,15 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   border-bottom: 1px solid var(--line-soft);
 }
 
-/* Project Totals table alignment */
-#projectTotalsTable td:first-child,
-#projectTotalsTable th:first-child { text-align: left; }
-#projectTotalsTable td:not(:first-child),
-#projectTotalsTable th:not(:first-child) { text-align: right; }
-
-/* Project Totals table column widths */
+/* Project Totals table — widths and alignment are driven by semantic
+   column classes (not position), so toggling/reordering columns can never
+   throw the header, body, and footer rows out of sync with each other. */
 #projectTotalsTable { table-layout: fixed; width: 100%; }
-#projectTotalsTable th:nth-child(1),
-#projectTotalsTable td:nth-child(1) { width: auto; }
-#projectTotalsTable th:nth-child(2),
-#projectTotalsTable td:nth-child(2) { width: 100px; }
-#projectTotalsTable th:nth-child(3),
-#projectTotalsTable td:nth-child(3) { width: 150px; }
-#projectTotalsTable th:nth-child(4),
-#projectTotalsTable td:nth-child(4) { width: 150px; }
-#projectTotalsTable th:nth-child(5),
-#projectTotalsTable td:nth-child(5) { width: 150px; }
+#projectTotalsTable .col-employee { width: auto; text-align: left; }
+#projectTotalsTable .col-hours    { width: 90px;  text-align: right; }
+#projectTotalsTable .col-rate     { width: 130px; text-align: right; }
+#projectTotalsTable .col-price    { width: 130px; text-align: right; }
+#projectTotalsTable .col-notes    { width: 260px; text-align: left; }
 
 /* ===== Employee Calendar — Gantt redesign ===== */
 .cal-mode-btns { display:flex; border:1px solid var(--line); border-radius:6px; overflow:hidden; }
