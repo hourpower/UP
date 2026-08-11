@@ -229,8 +229,10 @@
 
         <div id="accessPanel" class="stacked-form hidden">
           <p class="access-intro">Who can log hours to <strong id="accessProjectName"></strong>? Leave everyone unchecked to keep it open to your whole team.</p>
-          <p class="access-note">Optionally set a <strong>project-specific sales rate</strong> for an employee, starting from a chosen date — this overrides their standard sales rate for this project only. Click an employee's rate summary to expand it.</p>
-          <p id="accessInheritNote" class="access-note hidden"></p>
+          <div class="access-notes">
+            <p class="access-note-line">Project-specific <strong>sales rate</strong> overrides an employee's standard rate here, from a chosen date.</p>
+            <p id="accessInheritNote" class="access-note-line hidden"></p>
+          </div>
           <div id="accessCheckboxes" class="access-employee-list"></div>
           <div class="form-actions">
             <button type="button" id="saveAccessBtn" class="btn btn-primary">Save access</button>

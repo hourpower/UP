@@ -2543,50 +2543,54 @@ $('archivedTable').addEventListener('click', async (e) => {
 });
 
 
-function renderAccessRateLines(uid, dimmed) {
-  const lines = editingAccessRateLines[uid] || [];
-  const rows = lines.map((line, idx) => `
-    <div class="access-rate-line">
-      <input type="text" placeholder="dd-mm-yyyy" class="access-rate-date" data-uid="${uid}" data-idx="${idx}" value="${isoToDisplay(line.usedFrom || '')}" ${dimmed ? 'disabled' : ''} />
-      <input type="number" min="0" step="1" class="rate-input access-rate-val" data-uid="${uid}" data-idx="${idx}" value="${line.salesRate != null ? line.salesRate : ''}" ${dimmed ? 'disabled' : ''} />
-      <span class="access-rate-unit">DKK/h</span>
-      ${dimmed ? '' : `<button type="button" class="link-btn link-danger access-rate-remove" data-uid="${uid}" data-idx="${idx}">×</button>`}
-    </div>`).join('');
-  const emptyMsg = !lines.length
-    ? `<p class="work-week-empty">${dimmed ? 'No inherited rate set yet.' : "No project-specific rate set — the employee's standard sales rate applies."}</p>`
-    : '';
-  const addBtn = dimmed ? '' : `<button type="button" class="link-btn access-rate-add" data-uid="${uid}">+ Add rate</button>`;
-  return rows + emptyMsg + addBtn;
-}
-
 function renderAccessEmployeeList(assignedSet, dimmed) {
   if (!allUsersCache.length) {
     return `<p class="empty-state">No one has signed up yet — once your team creates accounts, they'll show up here.</p>`;
   }
-  const header = `
-    <div class="access-rate-legend">
-      <span>Sales rate from</span><span>DKK per hour</span>
-    </div>`;
-  const rows = allUsersCache.map(u => {
-    const checked = assignedSet.has(u.uid);
-    const lines = editingAccessRateLines[u.uid] || [];
-    const expanded = checked || lines.length > 0;
-    const summary = lines.length ? `${lines.length} rate${lines.length > 1 ? 's' : ''}` : 'No rate';
-    return `
-    <div class="access-employee-row">
-      <div class="access-employee-header-row">
-        <label class="access-employee-header">
-          <input type="checkbox" class="access-checkbox" value="${u.uid}" ${checked ? 'checked' : ''} />
-          <span>${escapeHtml(u.name)}</span>
-        </label>
-        <button type="button" class="link-btn access-rate-toggle" data-uid="${u.uid}">${summary} <span class="access-rate-chevron">${expanded ? '▾' : '▸'}</span></button>
-      </div>
-      <div class="access-rate-lines${dimmed ? ' dimmed' : ''}${expanded ? '' : ' hidden'}" data-uid="${u.uid}">
-        ${renderAccessRateLines(u.uid, dimmed)}
-      </div>
-    </div>`;
+  const legend = `<span></span><span></span><span class="access-col-label">Sales rate from</span><span class="access-col-label">DKK/h</span><span></span>`;
+  const groups = allUsersCache.map(u => renderAccessEmployeeGroup(u, assignedSet.has(u.uid), dimmed)).join('');
+  return legend + groups;
+}
+
+function renderAccessEmployeeGroup(u, checked, dimmed) {
+  // Every editable (non-dimmed) employee always keeps at least one line to type into.
+  if (!dimmed && !(editingAccessRateLines[u.uid] || []).length) {
+    editingAccessRateLines[u.uid] = [{ usedFrom: '', salesRate: null, costRate: null }];
+  }
+  const lines = editingAccessRateLines[u.uid] || [];
+  const rowsData = lines.length ? lines : [null]; // dimmed + nothing inherited -> one blank disabled row
+  const cells = rowsData.map((line, idx) => {
+    const isLast = idx === rowsData.length - 1;
+    const endCls = isLast ? ' access-cell-end' : '';
+    const checkboxCell = idx === 0
+      ? `<input type="checkbox" class="access-checkbox${endCls}" value="${u.uid}" ${checked ? 'checked' : ''} />`
+      : `<span class="access-cell${endCls}"></span>`;
+    const nameCell = idx === 0
+      ? `<span class="access-name${endCls}">${escapeHtml(u.name)}</span>`
+      : `<span class="access-cell${endCls}"></span>`;
+    const dateVal = line ? isoToDisplay(line.usedFrom || '') : '';
+    const rateVal = (line && line.salesRate != null) ? line.salesRate : '';
+    const dateCell = `<input type="text" placeholder="dd-mm-yyyy" class="access-rate-date${endCls}" data-uid="${u.uid}" data-idx="${idx}" value="${dateVal}" ${dimmed ? 'disabled' : ''} />`;
+    const rateCell = `<input type="number" min="0" step="1" class="rate-input access-rate-val${endCls}" data-uid="${u.uid}" data-idx="${idx}" value="${rateVal}" ${dimmed ? 'disabled' : ''} />`;
+    let actionCell;
+    if (dimmed) {
+      actionCell = `<span class="access-cell${endCls}"></span>`;
+    } else {
+      const removeBtn = `<button type="button" class="link-btn link-danger access-rate-remove" data-uid="${u.uid}" data-idx="${idx}">×</button>`;
+      const addBtn = isLast ? `<button type="button" class="link-btn access-rate-add" data-uid="${u.uid}">+</button>` : '';
+      actionCell = `<span class="access-row-actions${endCls}">${removeBtn}${addBtn}</span>`;
+    }
+    return checkboxCell + nameCell + dateCell + rateCell + actionCell;
   }).join('');
-  return header + rows;
+  return `<div class="access-employee-group" data-uid="${u.uid}" style="display:contents">${cells}</div>`;
+}
+
+function refreshAccessEmployeeGroup(uid) {
+  const group = document.querySelector(`.access-employee-group[data-uid="${uid}"]`);
+  const u = allUsersCache.find(x => x.uid === uid);
+  if (!group || !u) return;
+  const checked = group.querySelector('.access-checkbox')?.checked ?? false;
+  group.outerHTML = renderAccessEmployeeGroup(u, checked, accessPanelIsChild);
 }
 
 function readAccessRateLines() {
@@ -2644,55 +2648,18 @@ function openAccessPanel(projectId) {
   $('accessPanel').classList.remove('hidden');
 }
 
-function updateAccessRateSummary(uid) {
-  const count = (editingAccessRateLines[uid] || []).length;
-  const btn = document.querySelector(`.access-rate-toggle[data-uid="${uid}"]`);
-  if (!btn || !btn.firstChild) return;
-  btn.firstChild.textContent = count ? `${count} rate${count > 1 ? 's' : ''} ` : 'No rate ';
-}
-
 $('accessCheckboxes').addEventListener('click', (e) => {
+  const uid = e.target.dataset.uid;
   if (e.target.classList.contains('access-rate-add')) {
-    const uid = e.target.dataset.uid;
     (editingAccessRateLines[uid] = editingAccessRateLines[uid] || []).push({ usedFrom: '', salesRate: null, costRate: null });
-    const container = e.target.closest('.access-rate-lines');
-    if (container) {
-      container.innerHTML = renderAccessRateLines(uid, false);
-      container.classList.remove('hidden');
-      const chevron = container.closest('.access-employee-row')?.querySelector('.access-rate-chevron');
-      if (chevron) chevron.textContent = '▾';
-    }
-    updateAccessRateSummary(uid);
+    refreshAccessEmployeeGroup(uid);
     return;
   }
   if (e.target.classList.contains('access-rate-remove')) {
-    const uid = e.target.dataset.uid;
     const idx = parseInt(e.target.dataset.idx);
     editingAccessRateLines[uid] = (editingAccessRateLines[uid] || []).filter((_, i) => i !== idx);
-    const container = e.target.closest('.access-rate-lines');
-    if (container) container.innerHTML = renderAccessRateLines(uid, false);
-    updateAccessRateSummary(uid);
-    return;
+    refreshAccessEmployeeGroup(uid);
   }
-  const toggleBtn = e.target.closest('.access-rate-toggle');
-  if (toggleBtn) {
-    const row = toggleBtn.closest('.access-employee-row');
-    const lines = row.querySelector('.access-rate-lines');
-    const chevron = toggleBtn.querySelector('.access-rate-chevron');
-    const nowHidden = lines.classList.toggle('hidden');
-    chevron.textContent = nowHidden ? '▸' : '▾';
-  }
-});
-
-// Auto-expand an employee's rate section the moment they're given access —
-// that's exactly when a project-specific rate becomes relevant.
-$('accessCheckboxes').addEventListener('change', (e) => {
-  if (!e.target.classList.contains('access-checkbox') || !e.target.checked) return;
-  const row = e.target.closest('.access-employee-row');
-  const lines = row.querySelector('.access-rate-lines');
-  const chevron = row.querySelector('.access-rate-chevron');
-  lines.classList.remove('hidden');
-  if (chevron) chevron.textContent = '▾';
 });
 
 $('saveAccessBtn').addEventListener('click', async () => {
