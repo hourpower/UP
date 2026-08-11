@@ -541,6 +541,14 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// Scrolls a just-opened form/panel into view — used so clicking Edit/Staff
+// on a project row further down the table doesn't leave the form off-screen
+// above the current scroll position.
+function scrollFormIntoView(el) {
+  if (!el) return;
+  requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+
 function csvSafe(s) {
   const str = String(s ?? '').replace(/"/g, '""');
   return /[",\n]/.test(str) ? `"${str}"` : str;
@@ -2510,6 +2518,7 @@ $('projectsTable').addEventListener('click', async (e) => {
     buildRateLinesSections(p);
     $('accessPanel').classList.add('hidden');
     $('projectForm').classList.remove('hidden');
+    scrollFormIntoView($('projectForm'));
   }
   if (toggleId) {
     const p = projectsCache.find(x => x.id === toggleId);
@@ -2646,6 +2655,7 @@ function openAccessPanel(projectId) {
   $('accessCheckboxes').innerHTML = renderAccessEmployeeList(assigned, isChild);
   $('projectForm').classList.add('hidden');
   $('accessPanel').classList.remove('hidden');
+  scrollFormIntoView($('accessPanel'));
 }
 
 $('accessCheckboxes').addEventListener('click', (e) => {
