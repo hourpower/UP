@@ -543,10 +543,16 @@ function escapeHtml(str) {
 
 // Scrolls a just-opened form/panel into view — used so clicking Edit/Staff
 // on a project row further down the table doesn't leave the form off-screen
-// above the current scroll position.
+// above the current scroll position. Offsets by the sticky top bar's height
+// so the form isn't tucked underneath it.
 function scrollFormIntoView(el) {
   if (!el) return;
-  requestAnimationFrame(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  requestAnimationFrame(() => {
+    const topbar = document.querySelector('.topbar');
+    const offset = (topbar ? topbar.offsetHeight : 0) + 50;
+    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
+  });
 }
 
 function csvSafe(s) {
