@@ -3126,8 +3126,15 @@ $('weekSubmitBtn').addEventListener('click', async () => {
   const weekKey = toISODate(weekStart);
   const lockId  = `${currentUser.uid}_${weekKey}`;
   const isLocked = timesheetLocksCache.some(l => l.id === lockId);
-  if (isLocked) return; // already locked, editor must unlock
-  if (!confirm(`Submit hours for week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}?\n\nAfter submitting, hours for this week can only be changed by an editor.`)) return;
+  const isPartner = currentUser.employeeType === '1';
+  if (isLocked) {
+    if (!isPartner) return; // already locked, editor must unlock
+    if (!confirm(`Unlock your own submitted hours for week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}?\n\nYou'll be able to edit them again.`)) return;
+    await db.collection('timesheetLocks').doc(lockId).delete();
+    showStamp('Unlocked');
+    return;
+  }
+  if (!confirm(`Submit hours for week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}?\n\nAfter submitting, hours for this week can only be changed by an editor${isPartner ? ' (or you, since Partners can unlock their own weeks)' : ''}.`)) return;
   await db.collection('timesheetLocks').doc(lockId).set({
     userId: currentUser.uid, userName: currentUser.name,
     weekStart: weekKey, submittedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -3181,12 +3188,16 @@ function renderWeekGrid() {
 
   // Update submit button
   const locked = isWeekLocked(currentUser.uid, weekStart);
+  const isPartner = currentUser.employeeType === '1';
+  const partnerCanUnlock = locked && isPartner;
   const submitBtn = $('weekSubmitBtn');
   if (submitBtn) {
     submitBtn.innerHTML = locked ? `${SVG_LOCK_CLOSED}Submitted` : `${SVG_LOCK_OPEN}Submit week`;
-    submitBtn.title = locked ? 'This week is submitted — only an editor can unlock it' : 'Submit this week\'s hours';
-    submitBtn.disabled = locked;
-    submitBtn.style.opacity = locked ? '0.7' : '';
+    submitBtn.title = locked
+      ? (partnerCanUnlock ? 'This week is submitted — click to unlock it' : 'This week is submitted — only an editor can unlock it')
+      : 'Submit this week\'s hours';
+    submitBtn.disabled = locked && !partnerCanUnlock;
+    submitBtn.style.opacity = (locked && !partnerCanUnlock) ? '0.7' : '';
   }
 
   $('hoursHeading').textContent = `Hours week ${isoWeekNumber(weekStart)} · ${weekStart.getFullYear()}`;
