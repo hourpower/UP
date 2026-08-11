@@ -150,6 +150,8 @@ let ratesUnsub = null;
 let editingProjectId = null;
 let accessProjectId = null;
 let editingProjectUsers = [];
+let editingAccessRateLines = {};
+let accessPanelIsChild = false;
 let projectSortKey = 'code';
 let projectSortDir = 'desc';
 let collapsedParents = new Set();
@@ -2541,25 +2543,122 @@ $('archivedTable').addEventListener('click', async (e) => {
 });
 
 
+function renderAccessRateLines(uid, dimmed) {
+  const lines = editingAccessRateLines[uid] || [];
+  const rows = lines.map((line, idx) => `
+    <div class="access-rate-line">
+      <input type="text" placeholder="dd-mm-yyyy" class="access-rate-date" data-uid="${uid}" data-idx="${idx}" value="${isoToDisplay(line.usedFrom || '')}" ${dimmed ? 'disabled' : ''} />
+      <input type="number" min="0" step="1" class="rate-input access-rate-val" data-uid="${uid}" data-idx="${idx}" value="${line.salesRate != null ? line.salesRate : ''}" ${dimmed ? 'disabled' : ''} />
+      <span class="access-rate-unit">DKK/h</span>
+      ${dimmed ? '' : `<button type="button" class="link-btn link-danger access-rate-remove" data-uid="${uid}" data-idx="${idx}">×</button>`}
+    </div>`).join('');
+  const emptyMsg = !lines.length
+    ? `<p class="work-week-empty">${dimmed ? 'No inherited rate set yet.' : "No project-specific rate set — the employee's standard sales rate applies."}</p>`
+    : '';
+  const addBtn = dimmed ? '' : `<button type="button" class="link-btn access-rate-add" data-uid="${uid}">+ Add rate</button>`;
+  return rows + emptyMsg + addBtn;
+}
+
+function renderAccessEmployeeList(assignedSet, dimmed) {
+  if (!allUsersCache.length) {
+    return `<p class="empty-state">No one has signed up yet — once your team creates accounts, they'll show up here.</p>`;
+  }
+  return allUsersCache.map(u => `
+    <div class="access-employee-row">
+      <label class="access-employee-header">
+        <input type="checkbox" value="${u.uid}" ${assignedSet.has(u.uid) ? 'checked' : ''} />
+        <span>${escapeHtml(u.name)}</span>
+      </label>
+      <div class="access-rate-lines${dimmed ? ' dimmed' : ''}">
+        ${renderAccessRateLines(u.uid, dimmed)}
+      </div>
+    </div>`).join('');
+}
+
+function readAccessRateLines() {
+  const result = {};
+  allUsersCache.forEach(u => {
+    const origLines = editingAccessRateLines[u.uid] || [];
+    const outLines = [];
+    origLines.forEach((orig, idx) => {
+      const dateEl = document.querySelector(`.access-rate-date[data-uid="${u.uid}"][data-idx="${idx}"]`);
+      if (!dateEl) return;
+      const usedFrom = displayToIso(dateEl.value);
+      if (!usedFrom) return;
+      const rateEl = document.querySelector(`.access-rate-val[data-uid="${u.uid}"][data-idx="${idx}"]`);
+      const raw = rateEl ? rateEl.value.trim() : '';
+      const salesRate = (raw !== '' && !isNaN(parseFloat(raw)) && parseFloat(raw) >= 0) ? parseFloat(raw) : null;
+      outLines.push({ usedFrom, salesRate, costRate: orig.costRate != null ? orig.costRate : null });
+    });
+    outLines.sort((a, b) => a.usedFrom.localeCompare(b.usedFrom));
+    if (outLines.length) result[u.uid] = outLines;
+  });
+  return result;
+}
+
 function openAccessPanel(projectId) {
   const p = projectsCache.find(x => x.id === projectId);
   accessProjectId = projectId;
   $('accessProjectName').textContent = p.name;
   const assigned = new Set(p.assignedUserIds || []);
-  $('accessCheckboxes').innerHTML = allUsersCache.length
-    ? allUsersCache.map(u => `
-        <label class="checkbox-row">
-          <input type="checkbox" value="${u.uid}" ${assigned.has(u.uid) ? 'checked' : ''} />
-          ${escapeHtml(u.name)}
-        </label>`).join('')
-    : `<p class="empty-state">No one has signed up yet — once your team creates accounts, they'll show up here.</p>`;
+
+  const isParent = projectsCache.some(x => x.parentId === projectId);
+  const parentProject = p.parentId ? projectsCache.find(x => x.id === p.parentId) : null;
+  const isChild = !!parentProject;
+  accessPanelIsChild = isChild;
+
+  const note = $('accessInheritNote');
+  if (isChild) {
+    note.innerHTML = `This is a sub-project of <strong>${escapeHtml(parentProject.name)}</strong>. Sales rates are inherited from the parent project — edit them there instead.`;
+    note.classList.remove('hidden');
+  } else if (isParent) {
+    note.textContent = `This project has sub-projects. The sales rates set below also apply automatically to every sub-project.`;
+    note.classList.remove('hidden');
+  } else {
+    note.classList.add('hidden');
+  }
+
+  // Children show the parent's rate lines (read-only); everyone else shows their own.
+  const sourceRates = ((isChild ? parentProject.rateLines : p.rateLines) || {});
+  editingAccessRateLines = {};
+  allUsersCache.forEach(u => {
+    editingAccessRateLines[u.uid] = ((sourceRates[u.uid]) || []).map(l => ({ ...l }));
+  });
+
+  $('accessCheckboxes').innerHTML = renderAccessEmployeeList(assigned, isChild);
   $('projectForm').classList.add('hidden');
   $('accessPanel').classList.remove('hidden');
 }
 
+$('accessCheckboxes').addEventListener('click', (e) => {
+  if (e.target.classList.contains('access-rate-add')) {
+    const uid = e.target.dataset.uid;
+    (editingAccessRateLines[uid] = editingAccessRateLines[uid] || []).push({ usedFrom: '', salesRate: null, costRate: null });
+    const container = e.target.closest('.access-rate-lines');
+    if (container) container.innerHTML = renderAccessRateLines(uid, false);
+    return;
+  }
+  if (e.target.classList.contains('access-rate-remove')) {
+    const uid = e.target.dataset.uid;
+    const idx = parseInt(e.target.dataset.idx);
+    editingAccessRateLines[uid] = (editingAccessRateLines[uid] || []).filter((_, i) => i !== idx);
+    const container = e.target.closest('.access-rate-lines');
+    if (container) container.innerHTML = renderAccessRateLines(uid, false);
+  }
+});
+
 $('saveAccessBtn').addEventListener('click', async () => {
   const checked = [...$('accessCheckboxes').querySelectorAll('input[type="checkbox"]:checked')].map(cb => cb.value);
-  await db.collection('projects').doc(accessProjectId).update({ assignedUserIds: checked });
+  const update = { assignedUserIds: checked };
+  if (!accessPanelIsChild) {
+    update.rateLines = readAccessRateLines();
+  }
+  await db.collection('projects').doc(accessProjectId).update(update);
+  const p = projectsCache.find(x => x.id === accessProjectId);
+  if (p) {
+    p.assignedUserIds = checked;
+    if (!accessPanelIsChild) p.rateLines = update.rateLines;
+  }
   $('accessPanel').classList.add('hidden');
   showStamp('Saved');
 });

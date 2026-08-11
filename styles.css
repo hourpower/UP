@@ -1259,3 +1259,61 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .mdp-cell.mdp-today { font-weight: 700; color: var(--accent-dark); }
 .mdp-cell.mdp-selected { background: var(--accent); color: #fff; }
 .mdp-cell.mdp-selected:hover { background: var(--accent-dark); color: #fff; }
+
+
+/* ==========================================================
+   Project Access panel — per-employee visibility + project-specific
+   sales rate lines (with dynamic add/remove, and dimmed/inherited
+   display for sub-projects)
+   ========================================================== */
+.access-note {
+  font-size: 0.8rem;
+  color: var(--accent-dark);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 0 0 12px;
+}
+.access-employee-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 420px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+}
+.access-employee-row {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.access-employee-row:not(:last-child) { margin-bottom: 6px; }
+.access-employee-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.access-employee-header input { accent-color: var(--accent); }
+.access-rate-lines { margin: 8px 0 0 24px; }
+.access-rate-lines.dimmed { opacity: 0.55; }
+.access-rate-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.access-rate-line:last-of-type { margin-bottom: 6px; }
+.access-rate-date {
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.82rem;
+  background: #fff;
+  color: var(--ink);
+  width: 118px;
+}
+.access-rate-val { width: 72px; }
+.access-rate-unit { font-size: 0.76rem; color: var(--ink-soft); }
+.access-rate-lines .work-week-empty { margin: 0 0 6px; }
