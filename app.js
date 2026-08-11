@@ -176,6 +176,7 @@ function computeParentFees(parentId) {
 let weekStart = getMonday(new Date());
 let editorWeekStart = getMonday(new Date());
 let vacCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let calViewMode = 'daily';
 let planningBarsCache = [];
 let planViewMode = 'daily';
 let planCalDate  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -844,11 +845,16 @@ function isProjectVisibleToCurrentUser(p) {
 // A child project with no staff of its own marked inherits its parent's
 // list live — so parent changes keep flowing down automatically until a
 // child explicitly picks its own people, which then overrides it.
-function getEffectiveAssignedUserIds(p) {
+function getEffectiveAssignedUserIds(p, _visited = new Set()) {
   if (p.assignedUserIds && p.assignedUserIds.length) return p.assignedUserIds;
   if (p.parentId) {
+    if (_visited.has(p.id)) {
+      console.warn(`[getEffectiveAssignedUserIds] Circular parentId chain detected at project "${p.name}" (${p.id}) — check its Parent setting in Edit project.`);
+      return p.assignedUserIds || [];
+    }
+    _visited.add(p.id);
     const parent = projectsCache.find(x => x.id === p.parentId);
-    if (parent) return getEffectiveAssignedUserIds(parent);
+    if (parent) return getEffectiveAssignedUserIds(parent, _visited);
   }
   return p.assignedUserIds || [];
 }
