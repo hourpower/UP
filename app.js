@@ -58,6 +58,7 @@ let allAbsencesCache = [];
 let allEntriesCache = [];
 let officeCalendarCache = {};
 let timesheetLocksCache = []; // year string -> { closingDays:[{date,name}], deletedHolidays:[date,...] }
+let submittedTimesheetsSort = { key: 'weekStart', dir: 'desc' };
 
 // Called directly from the parent toggle span in the projects table
 window.toggleEditorParent = (pid) => {
@@ -905,12 +906,25 @@ function renderSubmittedTimesheets() {
   const card = $('submittedTimesheetsCard');
   const body = $('submittedTimesheetsBody');
   if (!card || !body) return;
-  const locks = [...timesheetLocksCache].sort((a, b) =>
-    a.weekStart.localeCompare(b.weekStart) || (a.userName || '').localeCompare(b.userName || ''));
+  const { key, dir } = submittedTimesheetsSort;
+  const mul = dir === 'asc' ? 1 : -1;
+  const locks = [...timesheetLocksCache].sort((a, b) => {
+    const primary = key === 'userName'
+      ? (a.userName || '').localeCompare(b.userName || '')
+      : a.weekStart.localeCompare(b.weekStart);
+    if (primary !== 0) return primary * mul;
+    // Tie-breaker always keeps same-week/same-name rows grouped together, regardless of sort direction.
+    return key === 'userName' ? a.weekStart.localeCompare(b.weekStart) : (a.userName || '').localeCompare(b.userName || '');
+  });
   card.style.display = locks.length ? '' : 'none';
   if (!locks.length) return;
+  const arrow = (col) => col === key ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
   body.innerHTML = `<table class="ledger-table" style="margin:0">
-    <thead><tr><th>Employee</th><th>Week</th><th></th></tr></thead>
+    <thead><tr>
+      <th class="sortable-th" data-sort-key="userName">Employee${arrow('userName')}</th>
+      <th class="sortable-th" data-sort-key="weekStart">Week${arrow('weekStart')}</th>
+      <th></th>
+    </tr></thead>
     <tbody>${locks.map(l => {
       const d = new Date(l.weekStart + 'T00:00:00');
       const weekEnd = addDays(d, 6);
@@ -924,6 +938,17 @@ function renderSubmittedTimesheets() {
       </tr>`;
     }).join('')}</tbody>
   </table>`;
+  body.querySelectorAll('.sortable-th').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.sortKey;
+      if (submittedTimesheetsSort.key === k) {
+        submittedTimesheetsSort.dir = submittedTimesheetsSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        submittedTimesheetsSort = { key: k, dir: k === 'weekStart' ? 'desc' : 'asc' };
+      }
+      renderSubmittedTimesheets();
+    });
+  });
 }
 
 window.unlockWeek = async (lockId, userName, weekLabel) => {
