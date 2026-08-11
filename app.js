@@ -157,6 +157,7 @@ let projectSortDir = 'desc';
 let collapsedParents = new Set();
 let projectTotalsShowSummary = true;
 let projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
+const TOTALS_COL_LABELS = { hours: 'Hours', sales: 'Sales', cost: 'Cost', salesRate: 'Sales rate', costRate: 'Cost rate', margin: 'Margin' };
 let editorTimesheetUid = '';
 let editorTsWeekStart  = getMonday(new Date());
 let collapsedSections = new Set(['absence']); // absence collapsed by default
@@ -1858,19 +1859,23 @@ function renderProjectTotals() {
     : [projectId];
 
   const sh = projectTotalsShowCols.has;
-  const showHours  = projectTotalsShowCols.has('hours');
-  const showSales  = projectTotalsShowCols.has('sales');
-  const showCost   = projectTotalsShowCols.has('cost');
-  const showMargin = projectTotalsShowCols.has('margin');
-  const showNotes  = projectTotalsShowCols.has('notes');
+  const showHours     = projectTotalsShowCols.has('hours');
+  const showSales     = projectTotalsShowCols.has('sales');
+  const showSalesRate = projectTotalsShowCols.has('salesRate');
+  const showCost      = projectTotalsShowCols.has('cost');
+  const showCostRate  = projectTotalsShowCols.has('costRate');
+  const showMargin    = projectTotalsShowCols.has('margin');
+  const showNotes     = projectTotalsShowCols.has('notes');
 
   // Update table header
   thead.innerHTML = '<th>Employee</th>' +
-    (showHours  ? '<th class="num">Hours</th>'       : '') +
-    (showSales  ? '<th class="num">Sales price</th>' : '') +
-    (showCost   ? '<th class="num">Cost price</th>'  : '') +
-    (showMargin ? '<th class="num">Margin</th>'      : '') +
-    (showNotes  ? '<th>Notes</th>'                   : '');
+    (showHours     ? '<th class="num">Hours</th>'            : '') +
+    (showSales     ? '<th class="num">Sales price</th>'      : '') +
+    (showSalesRate ? '<th class="num">Sales rate (DKK/h)</th>' : '') +
+    (showCost      ? '<th class="num">Cost price</th>'       : '') +
+    (showCostRate  ? '<th class="num">Cost rate (DKK/h)</th>'  : '') +
+    (showMargin    ? '<th class="num">Margin</th>'           : '') +
+    (showNotes     ? '<th>Notes</th>'                        : '');
 
   const byUser = {};
   allEntriesCache.filter(en =>
@@ -1878,12 +1883,14 @@ function renderProjectTotals() {
     (!from || en.date >= from) &&
     (!to   || en.date <= to)
   ).forEach(en => {
-    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0, notes: [] };
+    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, hours: 0, cost: 0, sales: 0, notes: [], salesRates: [], costRates: [] };
     const entryProject = projectById(en.projectId);
     const { salesRate, costRate } = resolveProjectRate(entryProject, en.date, en.userId);
     byUser[en.userId].hours += en.hours;
     byUser[en.userId].cost  += en.hours * costRate;
     byUser[en.userId].sales += en.hours * salesRate;
+    byUser[en.userId].salesRates.push(salesRate);
+    byUser[en.userId].costRates.push(costRate);
     if (en.note) byUser[en.userId].notes.push(`${formatDate(en.date)}: ${en.note}`);
   });
 
@@ -1891,28 +1898,41 @@ function renderProjectTotals() {
   $('totalsEmptyState').classList.toggle('hidden', userIds.length > 0);
   $('projectTotalsTable').classList.toggle('hidden', userIds.length === 0);
 
+  // A single number if the rate stayed constant across the period, or a
+  // min–max range if it changed partway through (e.g. a rate update).
+  const formatRateRange = (rates) => {
+    if (!rates.length) return '—';
+    const min = Math.min(...rates), max = Math.max(...rates);
+    const fmt = (n) => n.toLocaleString('da-DK', { maximumFractionDigits: 0 });
+    return min === max ? `${fmt(min)} kr/h` : `${fmt(min)}–${fmt(max)} kr/h`;
+  };
+
   let totalHours = 0, totalCost = 0, totalSales = 0;
   tbody.innerHTML = userIds.map(uid => {
-    const { userName, hours, cost, sales, notes } = byUser[uid];
+    const { userName, hours, cost, sales, notes, salesRates, costRates } = byUser[uid];
     totalHours += hours; totalCost += cost; totalSales += sales;
     const notesHtml = notes.length ? notes.map(n => `<div style="font-size:0.75rem;color:var(--ink-soft)">${escapeHtml(n)}</div>`).join('') : '—';
     return `<tr>
       <td>${escapeHtml(userName)}</td>
-      ${showHours  ? `<td class="num">${trimZeros(hours)}</td>` : ''}
-      ${showSales  ? `<td class="num">${formatDkk(sales)}</td>` : ''}
-      ${showCost   ? `<td class="num">${formatDkk(cost)}</td>`  : ''}
-      ${showMargin ? `<td class="num">${formatDkk(sales - cost)}</td>` : ''}
-      ${showNotes  ? `<td>${notesHtml}</td>` : ''}
+      ${showHours     ? `<td class="num">${trimZeros(hours)}</td>` : ''}
+      ${showSales     ? `<td class="num">${formatDkk(sales)}</td>` : ''}
+      ${showSalesRate ? `<td class="num">${formatRateRange(salesRates)}</td>` : ''}
+      ${showCost      ? `<td class="num">${formatDkk(cost)}</td>`  : ''}
+      ${showCostRate  ? `<td class="num">${formatRateRange(costRates)}</td>` : ''}
+      ${showMargin    ? `<td class="num">${formatDkk(sales - cost)}</td>` : ''}
+      ${showNotes     ? `<td>${notesHtml}</td>` : ''}
     </tr>`;
   }).join('');
 
   tfoot.innerHTML = `<tr class="totals-row">
     <td>Total</td>
-    ${showHours  ? `<td class="num">${trimZeros(totalHours)}</td>` : ''}
-    ${showSales  ? `<td class="num">${formatDkk(totalSales)}</td>` : ''}
-    ${showCost   ? `<td class="num">${formatDkk(totalCost)}</td>`  : ''}
-    ${showMargin ? `<td class="num">${formatDkk(totalSales - totalCost)}</td>` : ''}
-    ${showNotes  ? `<td></td>` : ''}
+    ${showHours     ? `<td class="num">${trimZeros(totalHours)}</td>` : ''}
+    ${showSales     ? `<td class="num">${formatDkk(totalSales)}</td>` : ''}
+    ${showSalesRate ? `<td class="num">—</td>` : ''}
+    ${showCost      ? `<td class="num">${formatDkk(totalCost)}</td>`  : ''}
+    ${showCostRate  ? `<td class="num">—</td>` : ''}
+    ${showMargin    ? `<td class="num">${formatDkk(totalSales - totalCost)}</td>` : ''}
+    ${showNotes     ? `<td></td>` : ''}
   </tr>`;
 
   const _fees = (project && getParentIds().has(project.id))
@@ -2031,10 +2051,12 @@ async function exportTotalsPdf() {
 
     // Build table columns based on visibility
     const colHeaders = ['Employee'];
-    if (projectTotalsShowCols.has('hours'))  colHeaders.push('Hours');
-    if (projectTotalsShowCols.has('sales'))  colHeaders.push('Sales price');
-    if (projectTotalsShowCols.has('cost'))   colHeaders.push('Cost price');
-    if (projectTotalsShowCols.has('margin')) colHeaders.push('Margin');
+    if (projectTotalsShowCols.has('hours'))     colHeaders.push('Hours');
+    if (projectTotalsShowCols.has('sales'))     colHeaders.push('Sales price');
+    if (projectTotalsShowCols.has('salesRate')) colHeaders.push('Sales rate (DKK/h)');
+    if (projectTotalsShowCols.has('cost'))      colHeaders.push('Cost price');
+    if (projectTotalsShowCols.has('costRate'))  colHeaders.push('Cost rate (DKK/h)');
+    if (projectTotalsShowCols.has('margin'))    colHeaders.push('Margin');
 
     const tableRows = [...$('projectTotalsTable').querySelectorAll('tbody tr')].map(tr =>
       [...tr.querySelectorAll('td')].map(td => td.textContent)
@@ -2073,8 +2095,9 @@ $('totalsProjectSelect').addEventListener('change', () => {
   projectTotalsShowCols = new Set(['hours', 'sales', 'cost', 'margin']);
   document.querySelectorAll('.totals-col-toggle').forEach(btn => {
     const col = btn.dataset.col;
-    btn.textContent = col.charAt(0).toUpperCase() + col.slice(1) + ' ✓';
-    btn.classList.add('active');
+    const on = projectTotalsShowCols.has(col);
+    btn.textContent = `${TOTALS_COL_LABELS[col] || col} ${on ? '✓' : '✗'}`;
+    btn.classList.toggle('active', on);
   });
   renderProjectTotals();
 });
@@ -2124,13 +2147,14 @@ $('toggleAllEntriesNotes').addEventListener('click', () => {
 document.querySelectorAll('.totals-col-toggle').forEach(btn => {
   btn.addEventListener('click', () => {
     const col = btn.dataset.col;
+    const label = TOTALS_COL_LABELS[col] || col;
     if (projectTotalsShowCols.has(col)) {
       projectTotalsShowCols.delete(col);
-      btn.textContent = `${col.charAt(0).toUpperCase() + col.slice(1)} ✗`;
+      btn.textContent = `${label} ✗`;
       btn.classList.remove('active');
     } else {
       projectTotalsShowCols.add(col);
-      btn.textContent = `${col.charAt(0).toUpperCase() + col.slice(1)} ✓`;
+      btn.textContent = `${label} ✓`;
       btn.classList.add('active');
     }
     renderProjectTotals();
