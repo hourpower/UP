@@ -1285,9 +1285,15 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
 .access-employee-row {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
 }
-.access-employee-row:not(:last-child) { margin-bottom: 6px; }
+.access-employee-row:not(:last-child) { margin-bottom: 4px; }
+.access-employee-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
 .access-employee-header {
   display: flex;
   align-items: center;
@@ -1296,7 +1302,26 @@ div.card-header-row.card-toggle:hover h2 { color: var(--accent-dark); }
   font-weight: 600;
 }
 .access-employee-header input { accent-color: var(--accent); }
+.access-rate-toggle {
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+.access-rate-toggle:hover { color: var(--accent-dark); }
+.access-rate-chevron { display: inline-block; width: 10px; }
+.access-rate-legend {
+  display: flex;
+  gap: 8px;
+  padding: 0 10px 4px 34px;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.access-rate-legend span:first-child { width: 118px; }
+.access-rate-legend span:last-child { width: 72px; }
 .access-rate-lines { margin: 8px 0 0 24px; }
+.access-rate-lines.hidden { display: none; }
 .access-rate-lines.dimmed { opacity: 0.55; }
 .access-rate-line {
   display: flex;

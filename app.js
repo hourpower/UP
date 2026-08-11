@@ -2235,7 +2235,7 @@ function renderProjectsTable() {
         <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
         <td class="row-actions">${statusSelect(p)}
           <button class="link-btn" data-edit-project="${p.id}">Edit</button>
-          <button class="link-btn" data-access-project="${p.id}">Access</button>
+          <button class="link-btn" data-access-project="${p.id}">Staff</button>
           <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
         </td>
       </tr>`);
@@ -2254,7 +2254,7 @@ function renderProjectsTable() {
             <td>${cn === 0 ? 'Everyone' : `${cn} ${cn === 1 ? 'person' : 'people'}`}</td>
             <td class="row-actions">${statusSelect(c)}
               <button class="link-btn" data-edit-project="${c.id}">Edit</button>
-              <button class="link-btn" data-access-project="${c.id}">Access</button>
+              <button class="link-btn" data-access-project="${c.id}">Staff</button>
               <button class="link-btn" data-toggle-project="${c.id}">Archive</button>
             </td>
           </tr>`);
@@ -2273,7 +2273,7 @@ function renderProjectsTable() {
         <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
         <td class="row-actions">${statusSelect(p)}
           <button class="link-btn" data-edit-project="${p.id}">Edit</button>
-          <button class="link-btn" data-access-project="${p.id}">Access</button>
+          <button class="link-btn" data-access-project="${p.id}">Staff</button>
           <button class="link-btn" data-toggle-project="${p.id}">Archive</button>
         </td>
       </tr>`);
@@ -2563,16 +2563,30 @@ function renderAccessEmployeeList(assignedSet, dimmed) {
   if (!allUsersCache.length) {
     return `<p class="empty-state">No one has signed up yet — once your team creates accounts, they'll show up here.</p>`;
   }
-  return allUsersCache.map(u => `
+  const header = `
+    <div class="access-rate-legend">
+      <span>Sales rate from</span><span>DKK per hour</span>
+    </div>`;
+  const rows = allUsersCache.map(u => {
+    const checked = assignedSet.has(u.uid);
+    const lines = editingAccessRateLines[u.uid] || [];
+    const expanded = checked || lines.length > 0;
+    const summary = lines.length ? `${lines.length} rate${lines.length > 1 ? 's' : ''}` : 'No rate';
+    return `
     <div class="access-employee-row">
-      <label class="access-employee-header">
-        <input type="checkbox" value="${u.uid}" ${assignedSet.has(u.uid) ? 'checked' : ''} />
-        <span>${escapeHtml(u.name)}</span>
-      </label>
-      <div class="access-rate-lines${dimmed ? ' dimmed' : ''}">
+      <div class="access-employee-header-row">
+        <label class="access-employee-header">
+          <input type="checkbox" class="access-checkbox" value="${u.uid}" ${checked ? 'checked' : ''} />
+          <span>${escapeHtml(u.name)}</span>
+        </label>
+        <button type="button" class="link-btn access-rate-toggle" data-uid="${u.uid}">${summary} <span class="access-rate-chevron">${expanded ? '▾' : '▸'}</span></button>
+      </div>
+      <div class="access-rate-lines${dimmed ? ' dimmed' : ''}${expanded ? '' : ' hidden'}" data-uid="${u.uid}">
         ${renderAccessRateLines(u.uid, dimmed)}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+  return header + rows;
 }
 
 function readAccessRateLines() {
@@ -2630,12 +2644,25 @@ function openAccessPanel(projectId) {
   $('accessPanel').classList.remove('hidden');
 }
 
+function updateAccessRateSummary(uid) {
+  const count = (editingAccessRateLines[uid] || []).length;
+  const btn = document.querySelector(`.access-rate-toggle[data-uid="${uid}"]`);
+  if (!btn || !btn.firstChild) return;
+  btn.firstChild.textContent = count ? `${count} rate${count > 1 ? 's' : ''} ` : 'No rate ';
+}
+
 $('accessCheckboxes').addEventListener('click', (e) => {
   if (e.target.classList.contains('access-rate-add')) {
     const uid = e.target.dataset.uid;
     (editingAccessRateLines[uid] = editingAccessRateLines[uid] || []).push({ usedFrom: '', salesRate: null, costRate: null });
     const container = e.target.closest('.access-rate-lines');
-    if (container) container.innerHTML = renderAccessRateLines(uid, false);
+    if (container) {
+      container.innerHTML = renderAccessRateLines(uid, false);
+      container.classList.remove('hidden');
+      const chevron = container.closest('.access-employee-row')?.querySelector('.access-rate-chevron');
+      if (chevron) chevron.textContent = '▾';
+    }
+    updateAccessRateSummary(uid);
     return;
   }
   if (e.target.classList.contains('access-rate-remove')) {
@@ -2644,7 +2671,28 @@ $('accessCheckboxes').addEventListener('click', (e) => {
     editingAccessRateLines[uid] = (editingAccessRateLines[uid] || []).filter((_, i) => i !== idx);
     const container = e.target.closest('.access-rate-lines');
     if (container) container.innerHTML = renderAccessRateLines(uid, false);
+    updateAccessRateSummary(uid);
+    return;
   }
+  const toggleBtn = e.target.closest('.access-rate-toggle');
+  if (toggleBtn) {
+    const row = toggleBtn.closest('.access-employee-row');
+    const lines = row.querySelector('.access-rate-lines');
+    const chevron = toggleBtn.querySelector('.access-rate-chevron');
+    const nowHidden = lines.classList.toggle('hidden');
+    chevron.textContent = nowHidden ? '▸' : '▾';
+  }
+});
+
+// Auto-expand an employee's rate section the moment they're given access —
+// that's exactly when a project-specific rate becomes relevant.
+$('accessCheckboxes').addEventListener('change', (e) => {
+  if (!e.target.classList.contains('access-checkbox') || !e.target.checked) return;
+  const row = e.target.closest('.access-employee-row');
+  const lines = row.querySelector('.access-rate-lines');
+  const chevron = row.querySelector('.access-rate-chevron');
+  lines.classList.remove('hidden');
+  if (chevron) chevron.textContent = '▾';
 });
 
 $('saveAccessBtn').addEventListener('click', async () => {
@@ -2863,7 +2911,7 @@ function renderExtraTable(type) {
       <td>${n === 0 ? 'Everyone' : `${n} ${n === 1 ? 'person' : 'people'}`}</td>
       <td class="row-actions">
         <button class="link-btn" data-extra-edit="${p.id}">Edit</button>
-        <button class="link-btn" data-extra-access="${p.id}">Access</button>
+        <button class="link-btn" data-extra-access="${p.id}">Staff</button>
         <button class="link-btn" data-extra-toggle="${p.id}">${p.active === false ? 'Unarchive' : 'Archive'}</button>
       </td>
     </tr>`;
