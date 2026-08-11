@@ -905,20 +905,19 @@ function renderSubmittedTimesheets() {
   const card = $('submittedTimesheetsCard');
   const body = $('submittedTimesheetsBody');
   if (!card || !body) return;
-  const locks = [...timesheetLocksCache].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  const locks = [...timesheetLocksCache].sort((a, b) =>
+    a.weekStart.localeCompare(b.weekStart) || (a.userName || '').localeCompare(b.userName || ''));
   card.style.display = locks.length ? '' : 'none';
   if (!locks.length) return;
   body.innerHTML = `<table class="ledger-table" style="margin:0">
-    <thead><tr><th>Employee</th><th>Week</th><th>Submitted</th><th></th></tr></thead>
+    <thead><tr><th>Employee</th><th>Week</th><th></th></tr></thead>
     <tbody>${locks.map(l => {
       const d = new Date(l.weekStart + 'T00:00:00');
       const weekEnd = addDays(d, 6);
       const weekLabel = `Week ${isoWeekNumber(d)} · ${d.getFullYear()} (${formatDate(l.weekStart)} – ${formatDate(toISODate(weekEnd))})`;
-      const submitted = l.submittedAt?.toDate ? l.submittedAt.toDate().toLocaleDateString('da-DK') : '—';
       return `<tr>
         <td>${escapeHtml(l.userName || '—')}</td>
         <td>${weekLabel}</td>
-        <td>${submitted}</td>
         <td class="row-actions">
           <button class="link-btn" onclick="unlockWeek('${l.id}', '${escapeHtml(l.userName || '')}', '${weekLabel}')">${SVG_LOCK_CLOSED}Unlock</button>
         </td>
