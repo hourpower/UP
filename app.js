@@ -210,7 +210,7 @@ const ABSENCE_TYPES = [
   { value: '',            label: '—'                                    },
   { value: 'afspad',      label: 'Compensatory time off (afspadsering)' },
   { value: 'ferielov',    label: 'Vacation'                             },
-  { value: 'feriefridag', label: 'Feriefriday'                          },
+  { value: 'feriefridag', label: 'Feriefridag'                          },
   { value: 'sick',        label: 'Sickness'                             },
   { value: 'day_off',     label: 'Day off'                              }
 ];
@@ -291,7 +291,7 @@ const RATE_SCHEDULES = {
     key: 'vacSchedule',
     fields: [
       { field: 'vacationRate',      label: 'Vacation',              defaultVal: 2.08 },
-      { field: 'feriefridageRate',  label: 'Day off (feriefridag)', defaultVal: 0.5  }
+      { field: 'feriefridageRate',  label: 'Feriefridag', defaultVal: 0.5  }
     ],
     unit: 'd/mo'
   }
@@ -1155,7 +1155,7 @@ function renderPlanEmployeeRows(u, cols, calHolidays, viewStart, viewEnd, mode) 
   const absByDate = {};
   allAbsencesCache.filter(a=>a.userId===uid).forEach(a=>{ absByDate[a.date]=a.type; });
   const SHOW_ABS = ['ferielov','feriefridag','day_off'];
-  const ABS_STYLE = { ferielov:{label:'Vacation',bg:'#B0BEC5',text:'#1C313A'}, feriefridag:{label:'Feriefriday',bg:'#D7CCC8',text:'#3E2723'}, day_off:{label:'Day off',bg:'#E0E0E0',text:'#424242'} };
+  const ABS_STYLE = { ferielov:{label:'Vacation',bg:'#B0BEC5',text:'#1C313A'}, feriefridag:{label:'Feriefridag',bg:'#D7CCC8',text:'#3E2723'}, day_off:{label:'Day off',bg:'#E0E0E0',text:'#424242'} };
 
   // Absence intervals
   const absIvs = [];
@@ -1276,7 +1276,7 @@ function renderVacationCalendar() {
   const TYPE_STYLE_CAL = {
     afspad:      { label:'Afspad.',      bg:'#CFD8DC', text:'#263238' },
     ferielov:    { label:'Vacation',     bg:'#B0BEC5', text:'#1C313A' },
-    feriefridag: { label:'Feriefriday', bg:'#D7CCC8', text:'#3E2723' },
+    feriefridag: { label:'Feriefridag', bg:'#D7CCC8', text:'#3E2723' },
     sick:        { label:'Sick',         bg:'#BDBDBD', text:'#212121' },
     day_off:     { label:'Day off',      bg:'#E0E0E0', text:'#424242' }
   };
@@ -1595,7 +1595,7 @@ function renderRatesTable() {
       </div>` : '';
 
     const vacSection = isPermanent
-      ? makeSection('vacSchedule', 'Vacation rate & Feriefriday rate', 'Add')
+      ? makeSection('vacSchedule', 'Vacation rate & Feriefridag rate', 'Add')
       : '';
 
     return `
@@ -3106,8 +3106,8 @@ function renderEditorTimesheet() {
     $('editorTsVacBody').innerHTML=`
       <tr><td class="flex-label" style="font-weight:700">Vacation rate</td><td class="num">${fmtD(vac.rate)}/mo</td></tr>
       <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd,flU+clU)}</td></tr>
-      <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Feriefriday rate</td><td class="num">${fmtD(ferie.rate)}/mo</td></tr>
-      <tr><td class="flex-label">Feriefriday YTD</td><td class="num">${fmtBal(ferie.ytd,fdU)}</td></tr>`;
+      <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Feriefridag rate</td><td class="num">${fmtD(ferie.rate)}/mo</td></tr>
+      <tr><td class="flex-label">Feriefridag YTD</td><td class="num">${fmtBal(ferie.ytd,fdU)}</td></tr>`;
   }
 }
 
@@ -3477,9 +3477,9 @@ function renderWeekGrid() {
         <tr><td class="flex-label" style="font-weight:700;padding-top:8px">Vacation rate</td><td class="num">${fmtDays(vac.rate)}/mo</td></tr>
         <tr><td class="flex-label">Vacation YTD</td><td class="num">${fmtBal(vac.ytd, flUsedYTDTotal)}</td></tr>
         <tr><td class="flex-label">Vacation total</td><td class="num">${fmtBal(vac.total, flUsedTotalTotal)}</td></tr>
-        <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Feriefriday rate</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
-        <tr><td class="flex-label">Feriefriday YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
-        <tr><td class="flex-label">Feriefriday total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
+        <tr><td class="flex-label" style="font-weight:700;padding-top:12px">Feriefridag rate</td><td class="num">${fmtDays(ferie.rate)}/mo</td></tr>
+        <tr><td class="flex-label">Feriefridag YTD</td><td class="num">${fmtBal(ferie.ytd, fdUsedYTD)}</td></tr>
+        <tr><td class="flex-label">Feriefridag total</td><td class="num">${fmtBal(ferie.total, fdUsedTotal)}</td></tr>`;
     }
   }
     dayTotals.map((t, i) => `<td class="${i >= 5 ? 'weekend' : ''}"><span class="foot-num">${trimZeros(t)}</span></td>`).join('') +
@@ -3994,7 +3994,7 @@ function renderAbsenceSummary() {
   const COLS = [
     { value: 'afspad',      label: 'Comp. time off' },
     { value: 'ferielov',    label: 'Vacation'        },
-    { value: 'feriefridag', label: 'Feriefriday'     },
+    { value: 'feriefridag', label: 'Feriefridag'     },
     { value: 'sick',        label: 'Sickness'        },
     { value: 'day_off',     label: 'Day off'         }
   ];
