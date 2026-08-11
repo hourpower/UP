@@ -836,7 +836,20 @@ function naturalCompare(a, b) {
 }
 
 function isProjectVisibleToCurrentUser(p) {
-  return !p.assignedUserIds || p.assignedUserIds.length === 0 || p.assignedUserIds.includes(currentUser.uid);
+  const ids = getEffectiveAssignedUserIds(p);
+  return !ids.length || ids.includes(currentUser.uid);
+}
+
+// A child project with no staff of its own marked inherits its parent's
+// list live — so parent changes keep flowing down automatically until a
+// child explicitly picks its own people, which then overrides it.
+function getEffectiveAssignedUserIds(p) {
+  if (p.assignedUserIds && p.assignedUserIds.length) return p.assignedUserIds;
+  if (p.parentId) {
+    const parent = projectsCache.find(x => x.id === p.parentId);
+    if (parent) return getEffectiveAssignedUserIds(parent);
+  }
+  return p.assignedUserIds || [];
 }
 
 function projectCodeBadgeHtml(p) {
@@ -2257,7 +2270,9 @@ function renderProjectsTable() {
       if (!collapsed) {
         children.forEach(c => {
           rendered.add(c.id);
-          const cn = (c.assignedUserIds || []).length;
+          const cOwnCount = (c.assignedUserIds || []).length;
+          const cn = getEffectiveAssignedUserIds(c).length;
+          const cInherited = cOwnCount === 0 && cn > 0;
           rows.push(`
           <tr class="project-child-row${c.status === 'paused' ? ' proj-paused' : ''}">
             <td class="toggle-col"></td>
@@ -2265,7 +2280,7 @@ function renderProjectsTable() {
             <td>${escapeHtml(c.name)}</td>
             <td>${escapeHtml(c.client || p.client || '')}</td>
             <td>${escapeHtml(PROJECT_CATEGORY_LABELS[c.category || p.category] || '—')}</td>
-            <td>${cn === 0 ? 'Everyone' : `${cn} ${cn === 1 ? 'person' : 'people'}`}</td>
+            <td>${cn === 0 ? 'Everyone' : `${cn} ${cn === 1 ? 'person' : 'people'}`}${cInherited ? ' <span class="optional">(inherited)</span>' : ''}</td>
             <td class="row-actions">${statusSelect(c)}
               <button class="link-btn" data-edit-project="${c.id}">Edit</button>
               <button class="link-btn" data-access-project="${c.id}">Staff</button>
@@ -2457,11 +2472,9 @@ $('projectForm').addEventListener('submit', async (e) => {
     if (!isParent) { updates.expectedFee = expectedFee; updates.subadvisors = subadvisors; }
     await db.collection('projects').doc(editingProjectId).update(updates);
   } else {
-    const parent = parentId ? projectsCache.find(p => p.id === parentId) : null;
-    const inheritedAccess = (parent && parent.assignedUserIds) ? [...parent.assignedUserIds] : [];
     await db.collection('projects').add({
       name, code, category, client, description, parentId, expectedFee, subadvisors, rateLines,
-      active: true, assignedUserIds: inheritedAccess,
+      active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
     });
@@ -2642,10 +2655,23 @@ function openAccessPanel(projectId) {
 
   const note = $('accessInheritNote');
   if (isChild) {
-    note.innerHTML = `This is a sub-project of <strong>${escapeHtml(parentProject.name)}</strong>. Sales rates are inherited from the parent project — edit them there instead.`;
+    const effectiveIds = getEffectiveAssignedUserIds(p);
+    const ownEmpty = !(p.assignedUserIds && p.assignedUserIds.length);
+    let staffPart;
+    if (ownEmpty) {
+      const names = effectiveIds.length
+        ? effectiveIds.map(id => allUsersCache.find(u => u.uid === id)?.name).filter(Boolean).join(', ')
+        : '';
+      staffPart = names
+        ? `No staff marked here, so it currently inherits <strong>${escapeHtml(names)}</strong> from the parent — check people below to use a different list just for this sub-project.`
+        : `No staff marked here, so it's currently open to everyone (inherited from the parent) — check people below to restrict it just for this sub-project.`;
+    } else {
+      staffPart = `Staff access below is set specifically for this sub-project, not inherited.`;
+    }
+    note.innerHTML = `Sub-project of <strong>${escapeHtml(parentProject.name)}</strong>. ${staffPart} Sales rates are always inherited from the parent — edit them there instead.`;
     note.classList.remove('hidden');
   } else if (isParent) {
-    note.textContent = `This project has sub-projects. The sales rates set below also apply automatically to every sub-project.`;
+    note.textContent = `This project has sub-projects. Any sub-project with no staff checked inherits the list below automatically, and the sales rates set below always apply to every sub-project too.`;
     note.classList.remove('hidden');
   } else {
     note.classList.add('hidden');
@@ -2970,7 +2996,7 @@ function renderEditorTimesheet() {
   const holidays    = getActiveHolidaysForDates(dateStrs);
   const absenceByDate = {};
   allAbsencesCache.filter(a => a.userId === uid).forEach(a => { absenceByDate[a.date] = a.type; });
-  const isVisible   = (p) => !p.assignedUserIds?.length || p.assignedUserIds.includes(uid);
+  const isVisible   = (p) => { const ids = getEffectiveAssignedUserIds(p); return !ids.length || ids.includes(uid); };
   const activeProjs = projectsCache.filter(p => p.active !== false && isVisible(p));
   const childrenMap = {};
   activeProjs.filter(p => p.parentId).forEach(p => { if (!childrenMap[p.parentId]) childrenMap[p.parentId]=[]; childrenMap[p.parentId].push(p); });
