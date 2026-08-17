@@ -36,6 +36,17 @@ service cloud.firestore {
       allow write: if isEditor();
     }
 
+    // Clients (billing details for invoicing) and company settings:
+    // any signed-in user can read (needed by the invoice flow), editors only write
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow write: if isEditor();
+    }
+    match /companySettings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isEditor();
+    }
+
     // Cost/sales rates: editor can read/write all; users can read their own
     match /rates/{userId} {
       allow read: if isEditor() || request.auth.uid == userId;

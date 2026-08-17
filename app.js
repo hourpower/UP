@@ -141,6 +141,8 @@ function getClosingDayForDate(dateStr) {
   return cd ? (cd.name || 'Office Closed') : null;
 }
 let allUsersCache = [];
+let clientsCache = [];
+let companySettingsCache = null;
 let archivedUsersCache = [];
 let ratesCache = {};
 let filteredRows = [];
@@ -773,6 +775,8 @@ auth.onAuthStateChanged(async (user) => {
       listenRates();
       listenAllAbsences();
       listenPlanningBars();
+      listenClients();
+      listenCompanySettings();
     } catch (err) {
       console.error('[Editor init error]', err);
       alert('Editor init error: ' + err.message + '\n\nCheck the browser console for details.');
@@ -802,6 +806,7 @@ function listenProjects() {
       renderProjectsTable();
       EXTRA_TYPES.forEach(({ type }) => renderExtraTable(type));
       renderFilterProjectSelect();
+      renderClientsTable();
     } else {
       renderWeekGrid();
     }
@@ -2391,15 +2396,15 @@ $('projectParent').addEventListener('change', () => {
   const parent = parentId ? projectsCache.find(p => p.id === parentId) : null;
   if (parent) {
     $('projectCategory').value = parent.category || '';
-    $('projectClient').value = parent.client || '';
     $('projectCategory').disabled = true;
+    if ($('clientSelect')) $('clientSelect').disabled = true;
+    populateClientSelect(parent.clientId || null, parent.client || '');
     $('projectClient').disabled = true;
-    if ($('clientSelect')) { $('clientSelect').value = parent.client || '__new__'; $('clientSelect').disabled = true; }
   } else {
     $('projectCategory').disabled = false;
     $('projectClient').disabled = false;
     if ($('clientSelect')) $('clientSelect').disabled = false;
-    populateClientSelect($('projectClient').value);
+    populateClientSelect(null, $('projectClient').value);
   }
   updateFeeRowVisibility();
 });
@@ -2421,7 +2426,7 @@ $('newProjectBtn').addEventListener('click', () => {
   $('projectCategory').disabled = false;
   $('projectClient').value = '';
   $('projectClient').disabled = false;
-  populateClientSelect('');
+  populateClientSelect(null, '');
   $('projectDesc').value = '';
   $('projectExpectedFee').value = '';
   $('projectSubadvisors').value = '';
@@ -2504,7 +2509,6 @@ $('projectForm').addEventListener('submit', async (e) => {
   const name = $('projectName').value.trim();
   const code = $('projectCode').value.trim().slice(0, 10);
   const category = $('projectCategory').value;
-  const client = getClientValue();
   const description = $('projectDesc').value.trim();
   const parentId = $('projectParent').value || null;
   const isParent = editingProjectId && getParentIds().has(editingProjectId);
@@ -2512,6 +2516,19 @@ $('projectForm').addEventListener('submit', async (e) => {
   const subadvisors  = isParent ? undefined : parseNonNegative($('projectSubadvisors').value);
   const rateLines = readPerUserRateLines();
   if (!name) return;
+
+  // Resolve the chosen client, creating a new client record on the fly if a
+  // brand-new name was typed rather than picked from the list.
+  let { clientId, clientName } = getClientValue();
+  if (!clientId && clientName) {
+    const newClientDoc = await db.collection('clients').add({
+      name: clientName, cvr: '', ean: '', street: '', zip: '', city: '', country: 'Danmark',
+      attention: '', paymentTermsDays: 14,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
+    });
+    clientId = newClientDoc.id;
+  }
+  const client = clientName;
 
   // Enforce max 10 children per parent
   if (parentId && !editingProjectId) {
@@ -2523,12 +2540,12 @@ $('projectForm').addEventListener('submit', async (e) => {
   }
 
   if (editingProjectId) {
-    const updates = { name, code, category, client, description, parentId, rateLines };
+    const updates = { name, code, category, client, clientId, description, parentId, rateLines };
     if (!isParent) { updates.expectedFee = expectedFee; updates.subadvisors = subadvisors; }
     await db.collection('projects').doc(editingProjectId).update(updates);
   } else {
     await db.collection('projects').add({
-      name, code, category, client, description, parentId, expectedFee, subadvisors, rateLines,
+      name, code, category, client, clientId, description, parentId, expectedFee, subadvisors, rateLines,
       active: true, assignedUserIds: [],
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       createdBy: currentUser.uid
@@ -2577,8 +2594,7 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectName').value = p.name;
     $('projectCode').value = p.code || '';
     $('projectCategory').value = p.category || '';
-    $('projectClient').value = p.client || '';
-    populateClientSelect(p.client || '');
+    populateClientSelect(p.clientId || null, p.client || '');
     // Parent setup
     const parentId = p.parentId || '';
     $('projectParent').value = parentId;
@@ -2946,6 +2962,8 @@ function initExtraTypeCards() {
     ['absenceCardToggle',         'absenceCardBody',         'absenceCardChevron'],
     ['submittedTimesheetsToggle', 'submittedTimesheetsBody', 'submittedTimesheetsChevron'],
     ['backupToggle',              'backupBody',              'backupChevron'],
+    ['companySettingsToggle',     'companySettingsBody',     'companySettingsChevron'],
+    ['clientsToggle',             'clientsBody',              'clientsChevron'],
   ].forEach(([t, b, c]) => {
     const el = document.getElementById(t);
     if (el && !el.dataset.toggleBound) {
@@ -3769,23 +3787,21 @@ $('addClosingDayBtn').addEventListener('click', async () => {
   }
 });
 
-function populateClientSelect(currentClient) {
+function populateClientSelect(currentClientId, currentClientName) {
   const sel = $('clientSelect');
   const input = $('projectClient');
   const warn  = $('clientSimilarWarn');
   if (!sel) return;
 
-  // Gather all unique client names from all projects (incl. archived)
-  const clients = [...new Set(
-    projectsCache.map(p => p.client).filter(c => c && c.trim())
-  )].sort((a, b) => a.localeCompare(b));
+  const clients = [...clientsCache].sort((a, b) => a.name.localeCompare(b.name));
+  const matchedById = currentClientId ? clients.find(c => c.id === currentClientId) : null;
 
   sel.innerHTML = '<option value="__new__">+ New client</option>' +
-    clients.map(c => `<option value="${c}"${c === currentClient ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    clients.map(c => `<option value="${c.id}"${c.id === currentClientId ? ' selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
 
-  // If current value is not in the list, show new-client input pre-filled
-  const isNew = currentClient && !clients.includes(currentClient);
-  if (isNew || !currentClient) {
+  // No matching record (new project, or legacy data not linked yet) -> fall back to the free-text "new client" box
+  const isNew = !matchedById && !!currentClientName;
+  if (isNew || (!currentClientId && !currentClientName)) {
     sel.value = '__new__';
   }
 
@@ -3793,26 +3809,23 @@ function populateClientSelect(currentClient) {
     const isNewClient = sel.value === '__new__';
     input.style.display = isNewClient ? '' : 'none';
     warn.style.display = 'none';
-    if (!isNewClient) input.value = sel.value;
+    if (!isNewClient) input.value = '';
   };
 
   sel.onchange = toggleNew;
   toggleNew();
 
-  // Pre-fill new-client input if editing a non-list client
-  if (isNew) input.value = currentClient;
+  if (isNew) input.value = currentClientName;
 
-  // Similarity check on input
+  // Similarity check on input, so a typo doesn't silently create a duplicate client
   input.oninput = () => {
     const val = input.value.trim().toLowerCase();
     warn.style.display = 'none';
     if (!val) return;
     const similar = clients.find(c => {
-      const ex = c.toLowerCase();
+      const ex = c.name.toLowerCase();
       if (ex === val) return false; // exact match is fine
-      // Check if one contains the other or they share >70% characters
       if (ex.includes(val) || val.includes(ex)) return true;
-      // Simple character overlap ratio
       const longer = ex.length > val.length ? ex : val;
       const shorter = ex.length > val.length ? val : ex;
       let matches = 0;
@@ -3820,18 +3833,197 @@ function populateClientSelect(currentClient) {
       return shorter.length > 3 && matches / shorter.length > 0.8;
     });
     if (similar) {
-      warn.textContent = `⚠ Similar to existing client: "${similar}"`;
+      warn.textContent = `⚠ Similar to existing client: "${similar.name}"`;
       warn.style.display = 'block';
     }
   };
 }
 
+// Returns { clientId, clientName }. clientId is null for a brand-new client
+// typed into the fallback box — the caller creates the record on save.
 function getClientValue() {
   const sel = $('clientSelect');
   const input = $('projectClient');
-  if (!sel) return '';
-  return sel.value === '__new__' ? input.value.trim() : sel.value;
+  if (!sel) return { clientId: null, clientName: '' };
+  if (sel.value === '__new__') {
+    return { clientId: null, clientName: input.value.trim() };
+  }
+  const client = clientsCache.find(c => c.id === sel.value);
+  return { clientId: sel.value, clientName: client ? client.name : '' };
 }
+
+// ============================================================
+// Clients & Company settings (billing details, used for invoicing)
+// ============================================================
+function listenClients() {
+  db.collection('clients').onSnapshot(snap => {
+    clientsCache = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name));
+    renderClientsTable();
+    // Refresh the project form's client dropdown too, if it's open
+    if ($('projectForm') && !$('projectForm').classList.contains('hidden')) {
+      populateClientSelect($('clientSelect').value !== '__new__' ? $('clientSelect').value : null, $('projectClient').value);
+    }
+  });
+}
+
+function listenCompanySettings() {
+  db.collection('companySettings').doc('main').onSnapshot(doc => {
+    companySettingsCache = doc.exists ? doc.data() : null;
+    const c = companySettingsCache || {};
+    $('companyName').value        = c.name        || '';
+    $('companyStreet').value      = c.street       || '';
+    $('companyZip').value         = c.zip          || '';
+    $('companyCity').value        = c.city         || '';
+    $('companyCountry').value     = c.country      || 'Danmark';
+    $('companyCvr').value         = c.cvr          || '';
+    $('companyBankReg').value     = c.bankReg      || '';
+    $('companyBankAccount').value = c.bankAccount  || '';
+  });
+}
+
+$('companySettingsForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await db.collection('companySettings').doc('main').set({
+    name:        $('companyName').value.trim(),
+    street:      $('companyStreet').value.trim(),
+    zip:         $('companyZip').value.trim(),
+    city:        $('companyCity').value.trim(),
+    country:     $('companyCountry').value.trim() || 'Danmark',
+    cvr:         $('companyCvr').value.trim(),
+    bankReg:     $('companyBankReg').value.trim(),
+    bankAccount: $('companyBankAccount').value.trim(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: currentUser.uid
+  });
+  showStamp('Saved');
+});
+
+function renderClientsTable() {
+  const tbody = $('clientsTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = clientsCache.length
+    ? clientsCache.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name)}</td>
+        <td>${escapeHtml(c.cvr || '—')}</td>
+        <td>${escapeHtml(c.ean || '—')}</td>
+        <td class="num">${c.paymentTermsDays != null ? c.paymentTermsDays : 14} days</td>
+        <td class="row-actions">
+          <button class="link-btn" data-edit-client="${c.id}">Edit</button>
+          <button class="link-btn link-danger" data-delete-client="${c.id}">Delete</button>
+        </td>
+      </tr>`).join('')
+    : `<tr><td colspan="5" class="empty-state">No clients yet.</td></tr>`;
+
+  // Show the import helper only while there are projects with a client name
+  // that isn't linked to a real client record yet.
+  const needsImport = projectsCache.some(p => p.client && p.client.trim() && !p.clientId);
+  $('importClientsBtn').classList.toggle('hidden', !needsImport);
+}
+
+function openClientForm(client) {
+  $('clientId').value            = client ? client.id : '';
+  $('clientName').value          = client ? client.name : '';
+  $('clientCvr').value           = client ? (client.cvr || '') : '';
+  $('clientEan').value           = client ? (client.ean || '') : '';
+  $('clientStreet').value        = client ? (client.street || '') : '';
+  $('clientZip').value           = client ? (client.zip || '') : '';
+  $('clientCity').value          = client ? (client.city || '') : '';
+  $('clientCountry').value       = client ? (client.country || 'Danmark') : 'Danmark';
+  $('clientAttention').value     = client ? (client.attention || '') : '';
+  $('clientPaymentTerms').value  = client && client.paymentTermsDays != null ? client.paymentTermsDays : 14;
+  $('clientForm').classList.remove('hidden');
+  scrollFormIntoView($('clientForm'));
+}
+
+$('newClientBtn').addEventListener('click', () => openClientForm(null));
+$('cancelClientBtn').addEventListener('click', () => $('clientForm').classList.add('hidden'));
+
+$('clientForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('clientName').value.trim();
+  const cvr  = $('clientCvr').value.trim();
+  const ean  = $('clientEan').value.trim();
+  if (!name) return;
+  if (!cvr && !ean) { alert('Enter at least a CVR or an EAN number for this client.'); return; }
+  const payload = {
+    name, cvr, ean,
+    street: $('clientStreet').value.trim(),
+    zip: $('clientZip').value.trim(),
+    city: $('clientCity').value.trim(),
+    country: $('clientCountry').value.trim() || 'Danmark',
+    attention: $('clientAttention').value.trim(),
+    paymentTermsDays: parseInt($('clientPaymentTerms').value) || 14
+  };
+  const id = $('clientId').value;
+  if (id) {
+    await db.collection('clients').doc(id).update(payload);
+    // Keep every project's plain-text client name in sync with the record
+    const affected = projectsCache.filter(p => p.clientId === id && p.client !== name);
+    if (affected.length) {
+      const batch = db.batch();
+      affected.forEach(p => batch.update(db.collection('projects').doc(p.id), { client: name }));
+      await batch.commit();
+    }
+  } else {
+    await db.collection('clients').add({
+      ...payload,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdBy: currentUser.uid
+    });
+  }
+  $('clientForm').classList.add('hidden');
+  showStamp('Saved');
+});
+
+$('clientsTableBody').addEventListener('click', async (e) => {
+  const editId = e.target.dataset.editClient;
+  const delId  = e.target.dataset.deleteClient;
+  if (editId) {
+    openClientForm(clientsCache.find(c => c.id === editId));
+    return;
+  }
+  if (delId) {
+    const inUse = projectsCache.filter(p => p.clientId === delId);
+    if (inUse.length) {
+      alert(`Can't delete this client — it's linked to ${inUse.length} project${inUse.length > 1 ? 's' : ''}. Change those projects to a different client first.`);
+      return;
+    }
+    const client = clientsCache.find(c => c.id === delId);
+    if (!confirm(`Delete client "${client ? client.name : ''}"?`)) return;
+    await db.collection('clients').doc(delId).delete();
+    showStamp('Deleted');
+  }
+});
+
+// One-time helper: turns existing projects' free-text Client names into real
+// client records (billing details left blank for you to fill in), and links
+// each project to the matching record.
+$('importClientsBtn').addEventListener('click', async () => {
+  const toLink = projectsCache.filter(p => p.client && p.client.trim() && !p.clientId);
+  if (!toLink.length) return;
+  const uniqueNames = [...new Set(toLink.map(p => p.client.trim()))];
+  if (!confirm(`Create ${uniqueNames.length} client record(s) from your existing projects' Client names, and link the matching projects to them?\n\nYou'll need to fill in CVR/EAN and address for each afterwards.`)) return;
+
+  const nameToId = {};
+  for (const name of uniqueNames) {
+    const existing = clientsCache.find(c => c.name.trim().toLowerCase() === name.toLowerCase());
+    if (existing) { nameToId[name] = existing.id; continue; }
+    const doc = await db.collection('clients').add({
+      name, cvr: '', ean: '', street: '', zip: '', city: '', country: 'Danmark',
+      attention: '', paymentTermsDays: 14,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
+    });
+    nameToId[name] = doc.id;
+  }
+  const batch = db.batch();
+  toLink.forEach(p => {
+    const cid = nameToId[p.client.trim()];
+    if (cid) batch.update(db.collection('projects').doc(p.id), { clientId: cid });
+  });
+  await batch.commit();
+  showStamp(`Imported ${uniqueNames.length} client(s), linked ${toLink.length} project(s)`);
+});
 
 function renderAbsenceCard() {
   renderAbsenceSummary();
