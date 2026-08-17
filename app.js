@@ -2821,6 +2821,18 @@ $('cancelAccessBtn').addEventListener('click', () => $('accessPanel').classList.
 // ============================================================
 // Generic extra-type cards (ADM, AQ, INT)
 // ============================================================
+// "New" badges on recently-added cards, auto-hidden after two weeks so they
+// don't need manual cleanup later.
+(function hideExpiredNewBadges() {
+  const NEW_BADGE_CUTOFF = new Date('2026-08-31T23:59:59');
+  if (new Date() > NEW_BADGE_CUTOFF) {
+    ['clientsNewBadge', 'companySettingsNewBadge'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+  }
+})();
+
 function initExtraTypeCards() {
   $('extraTypesContainer').innerHTML = EXTRA_TYPES.map(({ type, label }) => `
     <div class="card">
@@ -3930,16 +3942,17 @@ function renderClientsTable() {
   tbody.innerHTML = clientsCache.length
     ? clientsCache.map(c => `
       <tr>
-        <td>${escapeHtml(c.name)}${c.electronicInvoicing ? ' <span class="optional" title="Electronic invoicing enabled">⚡</span>' : ''}</td>
+        <td>${escapeHtml(c.name)}</td>
         <td>${escapeHtml(c.cvr || '—')}</td>
         <td>${escapeHtml(c.ean || '—')}</td>
         <td class="num">${c.paymentTermsDays != null ? c.paymentTermsDays : 14} days</td>
+        <td>${c.electronicInvoicing ? '⚡ Yes' : '—'}</td>
         <td class="row-actions">
           <button class="link-btn" data-edit-client="${c.id}">Edit</button>
           <button class="link-btn link-danger" data-delete-client="${c.id}">Delete</button>
         </td>
       </tr>`).join('')
-    : `<tr><td colspan="5" class="empty-state">No clients yet.</td></tr>`;
+    : `<tr><td colspan="6" class="empty-state">No clients yet.</td></tr>`;
 
   // Show the import helper only while there are projects with a client name
   // that isn't linked to a real client record yet.

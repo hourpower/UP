@@ -563,8 +563,9 @@ input, select, textarea {
   overflow-y: auto;
   margin-bottom: 6px;
 }
-.checkbox-row {
+label.checkbox-row {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 9px;
   font-size: 0.86rem;
@@ -1312,3 +1313,16 @@ span.access-cell-end,
 .access-row-actions.access-cell-end { padding-bottom: 6px; margin-bottom: 3px; border-bottom: 1px solid var(--line); }
 [disabled].access-rate-date,
 [disabled].access-rate-val { opacity: 0.55; background: #f7f7f5; }
+
+
+.new-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--stamp);
+  border-radius: 20px;
+  padding: 2px 8px;
+  vertical-align: middle;
+}
