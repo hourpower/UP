@@ -174,12 +174,12 @@
             <label>Company name
               <input type="text" id="companyName" />
             </label>
-            <div class="field-row">
+            <div class="field-row" style="grid-template-columns:2fr 100px 1fr;align-items:end">
               <label>Street & no.
                 <input type="text" id="companyStreet" />
               </label>
               <label>Zip code
-                <input type="text" id="companyZip" style="width:100px" />
+                <input type="text" id="companyZip" />
               </label>
               <label>City
                 <input type="text" id="companyCity" />
@@ -193,6 +193,7 @@
                 <input type="text" id="companyCvr" />
               </label>
             </div>
+            <h3 class="section-sub-heading" style="margin-top:16px">Bank</h3>
             <div class="field-row">
               <label>Bank reg. no.
                 <input type="text" id="companyBankReg" />
@@ -234,18 +235,18 @@
                 <input type="text" id="clientEan" />
               </label>
             </div>
-            <div class="field-row">
+            <div class="field-row" style="grid-template-columns:2fr 100px 1fr;align-items:end">
               <label>Street & no.
                 <input type="text" id="clientStreet" />
               </label>
               <label>Zip code
-                <input type="text" id="clientZip" style="width:100px" />
+                <input type="text" id="clientZip" />
               </label>
               <label>City
                 <input type="text" id="clientCity" />
               </label>
             </div>
-            <div class="field-row">
+            <div class="field-row" style="grid-template-columns:1fr 2fr 140px;align-items:end">
               <label>Country
                 <input type="text" id="clientCountry" value="Danmark" />
               </label>
@@ -253,7 +254,7 @@
                 <input type="text" id="clientAttention" />
               </label>
               <label>Payment terms (days)
-                <input type="number" min="0" step="1" id="clientPaymentTerms" value="14" style="width:100px" />
+                <input type="number" min="0" step="1" id="clientPaymentTerms" value="14" />
               </label>
             </div>
             <div class="form-actions">

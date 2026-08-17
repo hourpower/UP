@@ -275,6 +275,7 @@ input, select, textarea {
   display: grid;
   grid-template-columns: 180px 1fr;
   gap: 12px;
+  align-items: end;
 }
 @media (max-width: 480px) {
   .field-row { grid-template-columns: 1fr; }
