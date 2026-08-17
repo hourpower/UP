@@ -2523,7 +2523,7 @@ $('projectForm').addEventListener('submit', async (e) => {
   if (!clientId && clientName) {
     const newClientDoc = await db.collection('clients').add({
       name: clientName, cvr: '', ean: '', street: '', zip: '', city: '', country: 'Danmark',
-      attention: '', paymentTermsDays: 14,
+      attention: '', paymentTermsDays: 14, phone: '', email: '', poNumber: '',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
     });
     clientId = newClientDoc.id;
@@ -3958,6 +3958,9 @@ function openClientForm(client) {
   $('clientCountry').value       = client ? (client.country || 'Danmark') : 'Danmark';
   $('clientAttention').value     = client ? (client.attention || '') : '';
   $('clientPaymentTerms').value  = client && client.paymentTermsDays != null ? client.paymentTermsDays : 14;
+  $('clientPhone').value         = client ? (client.phone || '') : '';
+  $('clientEmail').value         = client ? (client.email || '') : '';
+  $('clientPoNumber').value      = client ? (client.poNumber || '') : '';
   $('clientForm').classList.remove('hidden');
   scrollFormIntoView($('clientForm'));
 }
@@ -3979,7 +3982,10 @@ $('clientForm').addEventListener('submit', async (e) => {
     city: $('clientCity').value.trim(),
     country: $('clientCountry').value.trim() || 'Danmark',
     attention: $('clientAttention').value.trim(),
-    paymentTermsDays: parseInt($('clientPaymentTerms').value) || 14
+    paymentTermsDays: parseInt($('clientPaymentTerms').value) || 14,
+    phone: $('clientPhone').value.trim(),
+    email: $('clientEmail').value.trim(),
+    poNumber: $('clientPoNumber').value.trim()
   };
   const id = $('clientId').value;
   if (id) {
@@ -4046,7 +4052,7 @@ $('importClientsBtn').addEventListener('click', async () => {
     if (existing) { nameToId[name] = existing.id; continue; }
     const doc = await db.collection('clients').add({
       name, cvr: '', ean: '', street: '', zip: '', city: '', country: 'Danmark',
-      attention: '', paymentTermsDays: 14,
+      attention: '', paymentTermsDays: 14, phone: '', email: '', poNumber: '',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
     });
     nameToId[name] = doc.id;
