@@ -759,10 +759,8 @@ auth.onAuthStateChanged(async (user) => {
 
   $('userView').classList.toggle('hidden', currentUser.role !== 'user');
   $('editorView').classList.toggle('hidden', currentUser.role !== 'editor');
-  const isPartner = currentUser.employeeType === '1';
-  $('invoicesView').classList.toggle('hidden', !(currentUser.role === 'editor' || isPartner));
+  $('invoicesView').classList.toggle('hidden', currentUser.role !== 'editor');
   // Editors see Invoices as part of their card stack, right after Projects.
-  // Partners have no Projects card, so it stays in its own top-level spot.
   if (currentUser.role === 'editor') {
     const projectsCard = $('projectsToggle')?.closest('.card');
     const invoicesSection = $('invoicesView');
@@ -778,15 +776,6 @@ auth.onAuthStateChanged(async (user) => {
     listenUserEntries();
     listenUserRates();
     listenUserAbsences();
-    if (isPartner) {
-      // Partners see the regular timesheet view, but also need broader data
-      // (everyone's entries, rates, clients) for the Invoices card above it.
-      listenAllEntriesForEditor();
-      listenAllUsers();
-      listenRates();
-      listenClients();
-      listenInvoices();
-    }
   } else {
     try {
       initExtraTypeCards();
