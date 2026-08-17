@@ -3000,6 +3000,7 @@ function initExtraTypeCards() {
     ['backupToggle',              'backupBody',              'backupChevron'],
     ['companySettingsToggle',     'companySettingsBody',     'companySettingsChevron'],
     ['clientsToggle',             'clientsBody',              'clientsChevron'],
+    ['projectsToggle',            'projectsBody',             'projectsChevron'],
   ].forEach(([t, b, c]) => {
     const el = document.getElementById(t);
     if (el && !el.dataset.toggleBound) {

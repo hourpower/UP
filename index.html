@@ -165,8 +165,11 @@
       </div>
 
       <div class="card">
-        <div class="card-header-row">
-          <h2>Projects</h2>
+        <div class="card-header-row card-toggle" id="projectsToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2>Projects <span class="chevron" id="projectsChevron">▾</span></h2>
+        </div>
+        <div id="projectsBody" class="collapsible-body">
+        <div class="row-actions" style="margin-bottom:12px">
           <button id="newProjectBtn" class="btn btn-primary" type="button">+ New project</button>
         </div>
 
@@ -246,8 +249,134 @@
             <tbody></tbody>
           </table>
         </div>
+        </div>
       </div>
 
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="clientsToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Clients <span class="new-badge" id="clientsNewBadge">★ New</span> <span class="chevron collapsed" id="clientsChevron">▾</span></h2>
+        </div>
+        <div id="clientsBody" class="collapsible-body hidden" style="padding:0 24px 20px">
+          <p class="access-intro" style="margin:0 0 12px">Billing details for the companies you invoice — pick a client when creating or editing a project instead of typing the name freehand.</p>
+          <div class="row-actions" style="margin-bottom:12px">
+            <button type="button" id="newClientBtn" class="btn btn-primary">+ New client</button>
+            <button type="button" id="importClientsBtn" class="btn btn-ghost hidden">Import clients from existing projects</button>
+          </div>
+          <form id="clientForm" class="stacked-form hidden" style="margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:8px">
+            <input type="hidden" id="clientId" />
+            <label>Client name
+              <div style="display:flex;gap:6px">
+                <input type="text" id="clientName" required style="flex:1" />
+                <button type="button" id="cvrLookupBtn" class="btn btn-ghost" style="white-space:nowrap">Look up</button>
+              </div>
+            </label>
+            <label class="checkbox-row" style="margin:2px 0 14px">
+              <input type="checkbox" id="clientEInvoicing" />
+              Electronic invoicing (OIOUBL/NemHandel) <span class="optional">requires CVR, EAN, email and contact person below</span>
+            </label>
+            <div class="field-row">
+              <label>CVR <span class="optional" id="clientCvrHint">at least one of CVR/EAN required</span>
+                <input type="text" id="clientCvr" />
+              </label>
+              <label>EAN <span class="optional hidden" id="clientEanHint">required for electronic invoicing</span>
+                <input type="text" id="clientEan" />
+              </label>
+            </div>
+            <div class="field-row" style="grid-template-columns:2fr 100px 1fr;align-items:end">
+              <label>Street & no.
+                <input type="text" id="clientStreet" />
+              </label>
+              <label>Zip code
+                <input type="text" id="clientZip" />
+              </label>
+              <label>City
+                <input type="text" id="clientCity" />
+              </label>
+            </div>
+            <div class="field-row" style="grid-template-columns:1fr 2fr 140px;align-items:end">
+              <label>Country
+                <input type="text" id="clientCountry" value="Danmark" />
+              </label>
+              <label>Contact person <span class="optional" id="clientAttentionHint">optional</span>
+                <input type="text" id="clientAttention" />
+              </label>
+              <label>Payment terms (days)
+                <input type="number" min="0" step="1" id="clientPaymentTerms" value="14" />
+              </label>
+            </div>
+            <div class="field-row" style="grid-template-columns:1fr 1fr 1fr;align-items:end">
+              <label>Phone <span class="optional">optional</span>
+                <input type="text" id="clientPhone" />
+              </label>
+              <label>Email <span class="optional" id="clientEmailHint">optional</span>
+                <input type="email" id="clientEmail" />
+              </label>
+              <label>PO/reference number <span class="optional">optional — often required by public-sector clients</span>
+                <input type="text" id="clientPoNumber" />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save client</button>
+              <button type="button" id="cancelClientBtn" class="btn btn-ghost">Cancel</button>
+            </div>
+          </form>
+          <div class="table-wrap">
+            <table class="ledger-table">
+              <thead><tr><th>Name</th><th>CVR</th><th>EAN</th><th class="num">Payment terms</th><th>E-invoicing</th><th></th></tr></thead>
+              <tbody id="clientsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header-row card-toggle" id="companySettingsToggle" role="button" tabindex="0" aria-expanded="false">
+          <h2>Company settings <span class="new-badge" id="companySettingsNewBadge">★ New</span> <span class="chevron collapsed" id="companySettingsChevron">▾</span></h2>
+        </div>
+        <div id="companySettingsBody" class="collapsible-body hidden" style="padding:0 24px 20px">
+          <p class="access-intro" style="margin:0 0 12px">Your own company's billing details — used on every invoice you generate.</p>
+          <form id="companySettingsForm" class="stacked-form">
+            <label>Company name
+              <input type="text" id="companyName" />
+            </label>
+            <div class="field-row" style="grid-template-columns:2fr 100px 1fr;align-items:end">
+              <label>Street & no.
+                <input type="text" id="companyStreet" />
+              </label>
+              <label>Zip code
+                <input type="text" id="companyZip" />
+              </label>
+              <label>City
+                <input type="text" id="companyCity" />
+              </label>
+            </div>
+            <div class="field-row">
+              <label>Country
+                <input type="text" id="companyCountry" value="Danmark" />
+              </label>
+              <label>CVR
+                <input type="text" id="companyCvr" />
+              </label>
+            </div>
+            <h3 class="section-sub-heading" style="margin-top:16px">Bank</h3>
+            <label>Bank name
+              <input type="text" id="companyBankName" placeholder="e.g. Danske Bank" />
+            </label>
+            <div class="field-row">
+              <label>Bank reg. no.
+                <input type="text" id="companyBankReg" />
+              </label>
+              <label>Bank account no.
+                <input type="text" id="companyBankAccount" />
+              </label>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">Save company settings</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <div class="card">
         <div class="card-header-row card-toggle" id="archivedToggle" role="button" tabindex="0" aria-expanded="false">
@@ -471,131 +600,6 @@
         </div>
       </div>
 
-
-      <div class="card">
-        <div class="card-header-row card-toggle" id="clientsToggle" role="button" tabindex="0" aria-expanded="false">
-          <h2>Clients <span class="new-badge" id="clientsNewBadge">★ New</span> <span class="chevron collapsed" id="clientsChevron">▾</span></h2>
-        </div>
-        <div id="clientsBody" class="collapsible-body hidden" style="padding:0 24px 20px">
-          <p class="access-intro" style="margin:0 0 12px">Billing details for the companies you invoice — pick a client when creating or editing a project instead of typing the name freehand.</p>
-          <div class="row-actions" style="margin-bottom:12px">
-            <button type="button" id="newClientBtn" class="btn btn-primary">+ New client</button>
-            <button type="button" id="importClientsBtn" class="btn btn-ghost hidden">Import clients from existing projects</button>
-          </div>
-          <form id="clientForm" class="stacked-form hidden" style="margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:8px">
-            <input type="hidden" id="clientId" />
-            <label>Client name
-              <div style="display:flex;gap:6px">
-                <input type="text" id="clientName" required style="flex:1" />
-                <button type="button" id="cvrLookupBtn" class="btn btn-ghost" style="white-space:nowrap">Look up</button>
-              </div>
-            </label>
-            <label class="checkbox-row" style="margin:2px 0 14px">
-              <input type="checkbox" id="clientEInvoicing" />
-              Electronic invoicing (OIOUBL/NemHandel) <span class="optional">requires CVR, EAN, email and contact person below</span>
-            </label>
-            <div class="field-row">
-              <label>CVR <span class="optional" id="clientCvrHint">at least one of CVR/EAN required</span>
-                <input type="text" id="clientCvr" />
-              </label>
-              <label>EAN <span class="optional hidden" id="clientEanHint">required for electronic invoicing</span>
-                <input type="text" id="clientEan" />
-              </label>
-            </div>
-            <div class="field-row" style="grid-template-columns:2fr 100px 1fr;align-items:end">
-              <label>Street & no.
-                <input type="text" id="clientStreet" />
-              </label>
-              <label>Zip code
-                <input type="text" id="clientZip" />
-              </label>
-              <label>City
-                <input type="text" id="clientCity" />
-              </label>
-            </div>
-            <div class="field-row" style="grid-template-columns:1fr 2fr 140px;align-items:end">
-              <label>Country
-                <input type="text" id="clientCountry" value="Danmark" />
-              </label>
-              <label>Contact person <span class="optional" id="clientAttentionHint">optional</span>
-                <input type="text" id="clientAttention" />
-              </label>
-              <label>Payment terms (days)
-                <input type="number" min="0" step="1" id="clientPaymentTerms" value="14" />
-              </label>
-            </div>
-            <div class="field-row" style="grid-template-columns:1fr 1fr 1fr;align-items:end">
-              <label>Phone <span class="optional">optional</span>
-                <input type="text" id="clientPhone" />
-              </label>
-              <label>Email <span class="optional" id="clientEmailHint">optional</span>
-                <input type="email" id="clientEmail" />
-              </label>
-              <label>PO/reference number <span class="optional">optional — often required by public-sector clients</span>
-                <input type="text" id="clientPoNumber" />
-              </label>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Save client</button>
-              <button type="button" id="cancelClientBtn" class="btn btn-ghost">Cancel</button>
-            </div>
-          </form>
-          <div class="table-wrap">
-            <table class="ledger-table">
-              <thead><tr><th>Name</th><th>CVR</th><th>EAN</th><th class="num">Payment terms</th><th>E-invoicing</th><th></th></tr></thead>
-              <tbody id="clientsTableBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header-row card-toggle" id="companySettingsToggle" role="button" tabindex="0" aria-expanded="false">
-          <h2>Company settings <span class="new-badge" id="companySettingsNewBadge">★ New</span> <span class="chevron collapsed" id="companySettingsChevron">▾</span></h2>
-        </div>
-        <div id="companySettingsBody" class="collapsible-body hidden" style="padding:0 24px 20px">
-          <p class="access-intro" style="margin:0 0 12px">Your own company's billing details — used on every invoice you generate.</p>
-          <form id="companySettingsForm" class="stacked-form">
-            <label>Company name
-              <input type="text" id="companyName" />
-            </label>
-            <div class="field-row" style="grid-template-columns:2fr 100px 1fr;align-items:end">
-              <label>Street & no.
-                <input type="text" id="companyStreet" />
-              </label>
-              <label>Zip code
-                <input type="text" id="companyZip" />
-              </label>
-              <label>City
-                <input type="text" id="companyCity" />
-              </label>
-            </div>
-            <div class="field-row">
-              <label>Country
-                <input type="text" id="companyCountry" value="Danmark" />
-              </label>
-              <label>CVR
-                <input type="text" id="companyCvr" />
-              </label>
-            </div>
-            <h3 class="section-sub-heading" style="margin-top:16px">Bank</h3>
-            <label>Bank name
-              <input type="text" id="companyBankName" placeholder="e.g. Danske Bank" />
-            </label>
-            <div class="field-row">
-              <label>Bank reg. no.
-                <input type="text" id="companyBankReg" />
-              </label>
-              <label>Bank account no.
-                <input type="text" id="companyBankAccount" />
-              </label>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Save company settings</button>
-            </div>
-          </form>
-        </div>
-      </div>
 
       <div class="card">
         <div class="card-header-row card-toggle" id="absenceCardToggle" role="button" tabindex="0" aria-expanded="false">
