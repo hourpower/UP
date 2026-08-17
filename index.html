@@ -230,11 +230,15 @@
                 <button type="button" id="cvrLookupBtn" class="btn btn-ghost" style="white-space:nowrap">Look up</button>
               </div>
             </label>
+            <label class="checkbox-row" style="margin:2px 0 14px">
+              <input type="checkbox" id="clientEInvoicing" />
+              Electronic invoicing (OIOUBL/NemHandel) <span class="optional">requires CVR, EAN, email and contact person below</span>
+            </label>
             <div class="field-row">
-              <label>CVR <span class="optional">at least one of CVR/EAN required</span>
+              <label>CVR <span class="optional" id="clientCvrHint">at least one of CVR/EAN required</span>
                 <input type="text" id="clientCvr" />
               </label>
-              <label>EAN
+              <label>EAN <span class="optional hidden" id="clientEanHint">required for electronic invoicing</span>
                 <input type="text" id="clientEan" />
               </label>
             </div>
@@ -253,7 +257,7 @@
               <label>Country
                 <input type="text" id="clientCountry" value="Danmark" />
               </label>
-              <label>Attention <span class="optional">optional</span>
+              <label>Attention <span class="optional" id="clientAttentionHint">optional</span>
                 <input type="text" id="clientAttention" />
               </label>
               <label>Payment terms (days)
@@ -264,10 +268,10 @@
               <label>Phone <span class="optional">optional</span>
                 <input type="text" id="clientPhone" />
               </label>
-              <label>Email <span class="optional">optional</span>
+              <label>Email <span class="optional" id="clientEmailHint">optional</span>
                 <input type="email" id="clientEmail" />
               </label>
-              <label>PO number <span class="optional">optional</span>
+              <label>PO number <span class="optional">optional — often required by public-sector clients</span>
                 <input type="text" id="clientPoNumber" />
               </label>
             </div>

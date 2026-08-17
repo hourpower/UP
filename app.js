@@ -2523,7 +2523,7 @@ $('projectForm').addEventListener('submit', async (e) => {
   if (!clientId && clientName) {
     const newClientDoc = await db.collection('clients').add({
       name: clientName, cvr: '', ean: '', street: '', zip: '', city: '', country: 'Danmark',
-      attention: '', paymentTermsDays: 14, phone: '', email: '', poNumber: '',
+      attention: '', paymentTermsDays: 14, phone: '', email: '', poNumber: '', electronicInvoicing: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
     });
     clientId = newClientDoc.id;
@@ -3930,7 +3930,7 @@ function renderClientsTable() {
   tbody.innerHTML = clientsCache.length
     ? clientsCache.map(c => `
       <tr>
-        <td>${escapeHtml(c.name)}</td>
+        <td>${escapeHtml(c.name)}${c.electronicInvoicing ? ' <span class="optional" title="Electronic invoicing enabled">⚡</span>' : ''}</td>
         <td>${escapeHtml(c.cvr || '—')}</td>
         <td>${escapeHtml(c.ean || '—')}</td>
         <td class="num">${c.paymentTermsDays != null ? c.paymentTermsDays : 14} days</td>
@@ -3961,9 +3961,22 @@ function openClientForm(client) {
   $('clientPhone').value         = client ? (client.phone || '') : '';
   $('clientEmail').value         = client ? (client.email || '') : '';
   $('clientPoNumber').value      = client ? (client.poNumber || '') : '';
+  $('clientEInvoicing').checked  = client ? !!client.electronicInvoicing : false;
+  updateClientRequiredHints();
   $('clientForm').classList.remove('hidden');
   scrollFormIntoView($('clientForm'));
 }
+
+// Toggles the visible "required" hints when Electronic invoicing is checked
+// (validation itself happens at submit time, in the form's submit handler).
+function updateClientRequiredHints() {
+  const on = $('clientEInvoicing').checked;
+  $('clientCvrHint').textContent = on ? 'required for electronic invoicing' : 'at least one of CVR/EAN required';
+  $('clientEanHint').classList.toggle('hidden', !on);
+  $('clientAttentionHint').textContent = on ? 'required for electronic invoicing' : 'optional';
+  $('clientEmailHint').textContent = on ? 'required for electronic invoicing' : 'optional';
+}
+$('clientEInvoicing').addEventListener('change', updateClientRequiredHints);
 
 $('newClientBtn').addEventListener('click', () => openClientForm(null));
 $('cancelClientBtn').addEventListener('click', () => $('clientForm').classList.add('hidden'));
@@ -3973,19 +3986,33 @@ $('clientForm').addEventListener('submit', async (e) => {
   const name = $('clientName').value.trim();
   const cvr  = $('clientCvr').value.trim();
   const ean  = $('clientEan').value.trim();
+  const email = $('clientEmail').value.trim();
+  const attention = $('clientAttention').value.trim();
+  const electronicInvoicing = $('clientEInvoicing').checked;
   if (!name) return;
-  if (!cvr && !ean) { alert('Enter at least a CVR or an EAN number for this client.'); return; }
+  if (electronicInvoicing) {
+    const missing = [];
+    if (!cvr) missing.push('CVR');
+    if (!ean) missing.push('EAN');
+    if (!email) missing.push('email');
+    if (!attention) missing.push('contact person');
+    if (missing.length) { alert(`Electronic invoicing needs: ${missing.join(', ')}.`); return; }
+  } else if (!cvr && !ean) {
+    alert('Enter at least a CVR or an EAN number for this client.');
+    return;
+  }
   const payload = {
     name, cvr, ean,
     street: $('clientStreet').value.trim(),
     zip: $('clientZip').value.trim(),
     city: $('clientCity').value.trim(),
     country: $('clientCountry').value.trim() || 'Danmark',
-    attention: $('clientAttention').value.trim(),
+    attention,
     paymentTermsDays: parseInt($('clientPaymentTerms').value) || 14,
     phone: $('clientPhone').value.trim(),
-    email: $('clientEmail').value.trim(),
-    poNumber: $('clientPoNumber').value.trim()
+    email,
+    poNumber: $('clientPoNumber').value.trim(),
+    electronicInvoicing
   };
   const id = $('clientId').value;
   if (id) {
@@ -4052,7 +4079,7 @@ $('importClientsBtn').addEventListener('click', async () => {
     if (existing) { nameToId[name] = existing.id; continue; }
     const doc = await db.collection('clients').add({
       name, cvr: '', ean: '', street: '', zip: '', city: '', country: 'Danmark',
-      attention: '', paymentTermsDays: 14, phone: '', email: '', poNumber: '',
+      attention: '', paymentTermsDays: 14, phone: '', email: '', poNumber: '', electronicInvoicing: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: currentUser.uid
     });
     nameToId[name] = doc.id;
