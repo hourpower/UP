@@ -4000,32 +4000,12 @@ $('clientForm').addEventListener('submit', async (e) => {
   showStamp('Saved');
 });
 
-// Auto-fills name/address from the official CVR registry (cvrapi.dk — free,
-// public, no key needed). EAN numbers live in a separate registry and
-// aren't covered by this lookup, so that field is left for manual entry.
-$('cvrLookupBtn').addEventListener('click', async () => {
-  const cvr = $('clientCvr').value.trim().replace(/\D/g, '');
-  if (!/^\d{8}$/.test(cvr)) { alert('Enter a valid 8-digit CVR number first, then click Look up.'); return; }
-  const btn = $('cvrLookupBtn');
-  const origText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = 'Looking up…';
-  try {
-    const res = await fetch(`https://cvrapi.dk/api?search=${cvr}&country=dk`);
-    const data = await res.json();
-    if (data.error) { alert('CVR lookup failed: ' + data.error); return; }
-    if (data.name)          $('clientName').value = data.name;
-    if (data.address)       $('clientStreet').value = data.address;
-    if (data.zipcode != null) $('clientZip').value = String(data.zipcode);
-    if (data.city)          $('clientCity').value = data.city;
-    $('clientCountry').value = 'Danmark';
-    showStamp('Filled in from the CVR registry');
-  } catch (err) {
-    alert('CVR lookup failed — check your connection and try again.\n\n' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = origText;
-  }
+// Opens a search for the typed company name in a new tab, so you can look
+// up CVR/EAN/address yourself and copy them back in — no API involved.
+$('cvrLookupBtn').addEventListener('click', () => {
+  const name = $('clientName').value.trim();
+  if (!name) { alert('Type the client name first, then click Look up.'); return; }
+  window.open(`https://www.google.com/search?q=${encodeURIComponent(name + ' CVR')}`, '_blank', 'noopener');
 });
 
 $('clientsTableBody').addEventListener('click', async (e) => {

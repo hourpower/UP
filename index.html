@@ -221,14 +221,14 @@
           <form id="clientForm" class="stacked-form hidden" style="margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:8px">
             <input type="hidden" id="clientId" />
             <label>Client name
-              <input type="text" id="clientName" required />
+              <div style="display:flex;gap:6px">
+                <input type="text" id="clientName" required style="flex:1" />
+                <button type="button" id="cvrLookupBtn" class="btn btn-ghost" style="white-space:nowrap">Look up</button>
+              </div>
             </label>
             <div class="field-row">
               <label>CVR <span class="optional">at least one of CVR/EAN required</span>
-                <div style="display:flex;gap:6px">
-                  <input type="text" id="clientCvr" style="flex:1" />
-                  <button type="button" id="cvrLookupBtn" class="btn btn-ghost" style="white-space:nowrap">Look up</button>
-                </div>
+                <input type="text" id="clientCvr" />
               </label>
               <label>EAN
                 <input type="text" id="clientEan" />
