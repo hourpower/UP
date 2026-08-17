@@ -1075,7 +1075,8 @@ if ($('planningCalToggle')) {
 function buildPlanProjectOptions(selected='') {
   const opts = ['<option value="">— Pick a project —</option>'];
   const active = projectsCache.filter(p => p.active!==false && p.status!=='paused');
-  sortItems(active).forEach(p => opts.push(`<option value="${p.id}"${p.id===selected?' selected':''}>${p.code?p.code+' — ':''}${escapeHtml(p.name)}</option>`));
+  getHierarchicalProjectOrder(active).forEach(({ project: p, role }) =>
+    opts.push(`<option value="${p.id}"${p.id===selected?' selected':''}${projectOptionStyleAttr(role)}>${p.code?p.code+' — ':''}${escapeHtml(p.name)}</option>`));
   (extraCache['aq']||[]).filter(p=>p.active!==false).forEach(p => opts.push(`<option value="${p.id}"${p.id===selected?' selected':''}>AQ: ${escapeHtml(p.name)}</option>`));
   return opts.join('');
 }
@@ -2200,37 +2201,31 @@ $('exportTotalsCsvBtn').addEventListener('click', exportTotalsCsv);
 $('exportTotalsPdfBtn').addEventListener('click', exportTotalsPdf);
 
 function renderFilterProjectSelect() {
-  // Sort projects by code descending (highest first) for the dropdowns
-  const sortedProjects = [...projectsCache].sort((a, b) => {
-    const codeA = a.code || '';
-    const codeB = b.code || '';
-    if (codeA && codeB) return codeB.localeCompare(codeA);
-    if (codeA) return -1;
-    if (codeB) return 1;
-    return (a.name || '').localeCompare(b.name || '');
-  });
+  const orderedProjects = getHierarchicalProjectOrder(projectsCache);
 
-  const projectOptions = (items) => items.map(p =>
+  const projectOptions = (entries) => entries.map(({ project: p, role }) =>
+    `<option value="${p.id}"${projectOptionStyleAttr(role)}>${escapeHtml(projectLabelText(p))}</option>`).join('');
+  const flatOptions = (items) => items.map(p =>
     `<option value="${p.id}">${escapeHtml(projectLabelText(p))}</option>`).join('');
 
   // All entries filter — Projects first, then ADM/AQ/INT
   const filterSel = $('filterProject');
   const filterCurrent = filterSel.value;
   filterSel.innerHTML = '<option value="">All items</option>';
-  if (sortedProjects.length) {
-    filterSel.innerHTML += `<optgroup label="Projects">${projectOptions(sortedProjects)}</optgroup>`;
+  if (orderedProjects.length) {
+    filterSel.innerHTML += `<optgroup label="Projects">${projectOptions(orderedProjects)}</optgroup>`;
   }
   EXTRA_TYPES.forEach(({ type, label }) => {
     if ((extraCache[type] || []).length) {
-      filterSel.innerHTML += `<optgroup label="${label}">${projectOptions(extraCache[type])}</optgroup>`;
+      filterSel.innerHTML += `<optgroup label="${label}">${flatOptions(extraCache[type])}</optgroup>`;
     }
   });
   filterSel.value = filterCurrent;
 
-  // Project totals — Projects only, sorted descending
+  // Project totals — Projects only, parent-then-children order
   const totalsSel = $('totalsProjectSelect');
   const totalsCurrent = totalsSel.value;
-  totalsSel.innerHTML = '<option value="">Choose a project…</option>' + projectOptions(sortedProjects);
+  totalsSel.innerHTML = '<option value="">Choose a project…</option>' + projectOptions(orderedProjects);
   totalsSel.value = totalsCurrent;
 }
 
@@ -3249,6 +3244,42 @@ function listenUserEntries() {
       userEntriesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       renderWeekGrid();
     });
+}
+
+// Orders a flat project list so every parent is immediately followed by its
+// own children (never interleaved with other parents/standalones), tagging
+// each entry with its role so dropdown builders can style it: bold parents,
+// thin children, normal weight for standalones.
+function getHierarchicalProjectOrder(projects) {
+  const parentIds = new Set(projects.filter(p => p.parentId).map(p => p.parentId));
+  const byParent = {};
+  projects.forEach(p => {
+    if (p.parentId) (byParent[p.parentId] = byParent[p.parentId] || []).push(p);
+  });
+  const topLevel = projects.filter(p => !p.parentId);
+  topLevel.sort((a, b) => {
+    const codeA = a.code || '', codeB = b.code || '';
+    if (codeA && codeB) return codeB.localeCompare(codeA, undefined, { numeric: true });
+    if (codeA) return -1;
+    if (codeB) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  const result = [];
+  topLevel.forEach(p => {
+    const isParent = parentIds.has(p.id);
+    result.push({ project: p, role: isParent ? 'parent' : 'standalone' });
+    if (isParent) {
+      (byParent[p.id] || [])
+        .sort((a, b) => (a.code || a.name).localeCompare(b.code || b.name, undefined, { numeric: true }))
+        .forEach(c => result.push({ project: c, role: 'child' }));
+    }
+  });
+  return result;
+}
+function projectOptionStyleAttr(role) {
+  if (role === 'parent') return ' style="font-weight:600"';
+  if (role === 'child') return ' style="font-weight:300"';
+  return '';
 }
 
 // Sort projects: by code descending, then by name
@@ -4420,21 +4451,26 @@ function renderAllEntries() {
 function populateEditProjectSelect(currentProjectId) {
   const sel = $('editEntryProject');
   sel.innerHTML = '';
-  const addGroup = (label, items) => {
+  const addGroup = (label, items, hierarchical) => {
     if (!items.length) return;
     const grp = document.createElement('optgroup');
     grp.label = label;
-    items.forEach(p => {
+    const entries = hierarchical
+      ? getHierarchicalProjectOrder(items)
+      : items.map(p => ({ project: p, role: 'standalone' }));
+    entries.forEach(({ project: p, role }) => {
       const opt = document.createElement('option');
       opt.value = p.id;
       opt.textContent = projectLabelText(p);
+      if (role === 'parent') opt.style.fontWeight = '600';
+      if (role === 'child') opt.style.fontWeight = '300';
       if (p.id === currentProjectId) opt.selected = true;
       grp.appendChild(opt);
     });
     sel.appendChild(grp);
   };
-  EXTRA_TYPES.forEach(({ type, label }) => addGroup(label, extraCache[type] || []));
-  addGroup('Projects', projectsCache);
+  EXTRA_TYPES.forEach(({ type, label }) => addGroup(label, extraCache[type] || [], false));
+  addGroup('Projects', projectsCache, true);
 }
 
 function openEntryEditPanel(entryId) {
