@@ -759,6 +759,17 @@ auth.onAuthStateChanged(async (user) => {
 
   $('userView').classList.toggle('hidden', currentUser.role !== 'user');
   $('editorView').classList.toggle('hidden', currentUser.role !== 'editor');
+  const isPartner = currentUser.employeeType === '1';
+  $('invoicesView').classList.toggle('hidden', !(currentUser.role === 'editor' || isPartner));
+  // Editors see Invoices as part of their card stack, right after Projects.
+  // Partners have no Projects card, so it stays in its own top-level spot.
+  if (currentUser.role === 'editor') {
+    const projectsCard = $('projectsToggle')?.closest('.card');
+    const invoicesSection = $('invoicesView');
+    if (projectsCard && invoicesSection && projectsCard.nextElementSibling !== invoicesSection) {
+      projectsCard.insertAdjacentElement('afterend', invoicesSection);
+    }
+  }
 
   listenProjects();
   listenOfficeCalendar();
@@ -767,6 +778,15 @@ auth.onAuthStateChanged(async (user) => {
     listenUserEntries();
     listenUserRates();
     listenUserAbsences();
+    if (isPartner) {
+      // Partners see the regular timesheet view, but also need broader data
+      // (everyone's entries, rates, clients) for the Invoices card above it.
+      listenAllEntriesForEditor();
+      listenAllUsers();
+      listenRates();
+      listenClients();
+      listenInvoices();
+    }
   } else {
     try {
       initExtraTypeCards();
@@ -777,6 +797,7 @@ auth.onAuthStateChanged(async (user) => {
       listenPlanningBars();
       listenClients();
       listenCompanySettings();
+      listenInvoices();
     } catch (err) {
       console.error('[Editor init error]', err);
       alert('Editor init error: ' + err.message + '\n\nCheck the browser console for details.');
@@ -4136,6 +4157,312 @@ $('importClientsBtn').addEventListener('click', async () => {
   });
   await batch.commit();
   showStamp(`Imported ${uniqueNames.length} client(s), linked ${toLink.length} project(s)`);
+});
+
+// ============================================================
+// Invoices (Stage 2: collect hours into an editable draft; PDF/OIOUBL
+// generation and Approve/lock/numbering land in later stages)
+// ============================================================
+let invoicesCache = [];
+let editingInvoiceId = null;
+let editingInvoiceLines = {}; // uid -> { userName, mode: 'total'|'perComment', lines:[{desc,hours,salesRate,entryIds}], _rawEntries }
+
+makeToggle('invoicesToggle', 'invoicesBody', 'invoicesChevron');
+
+function listenInvoices() {
+  db.collection('invoices').onSnapshot(snap => {
+    invoicesCache = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.dateFrom || '').localeCompare(a.dateFrom || ''));
+    renderInvoicesTable();
+  });
+}
+
+function invoiceTotal(inv) {
+  return Object.values(inv.linesByUser || {}).reduce((sum, emp) =>
+    sum + emp.lines.reduce((s, l) => s + (l.hours * l.salesRate || 0), 0), 0);
+}
+
+function renderInvoicesTable() {
+  const tbody = $('invoicesTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = invoicesCache.length ? invoicesCache.map(inv => {
+    const project = projectsCache.find(p => p.id === inv.projectId);
+    const client = clientsCache.find(c => c.id === inv.clientId);
+    return `<tr>
+      <td>${escapeHtml(project ? project.name : '—')}${inv.includeChildren ? ' <span class="optional">+ sub-projects</span>' : ''}</td>
+      <td>${escapeHtml(client ? client.name : '—')}</td>
+      <td>${formatDate(inv.dateFrom)} – ${formatDate(inv.dateTo)}</td>
+      <td><span class="stamp-badge${inv.status === 'draft' ? ' stamp-badge-off' : ''}">${inv.status === 'draft' ? 'Draft' : 'Approved'}</span></td>
+      <td class="num">${formatDkk(invoiceTotal(inv))}</td>
+      <td class="row-actions">
+        <button class="link-btn" data-edit-invoice="${inv.id}">Edit</button>
+        <button class="link-btn link-danger" data-delete-invoice="${inv.id}">Delete</button>
+      </td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" class="empty-state">No invoices yet.</td></tr>`;
+}
+
+function populateInvoiceProjectSelect(selectedId) {
+  const sel = $('invoiceProject');
+  const active = projectsCache.filter(p => p.active !== false);
+  const ordered = getHierarchicalProjectOrder(active);
+  sel.innerHTML = '<option value="">— Pick a project —</option>' +
+    ordered.map(({ project: p, role }) =>
+      `<option value="${p.id}"${p.id === selectedId ? ' selected' : ''}${projectOptionStyleAttr(role)}>${p.code ? p.code + ' — ' : ''}${escapeHtml(p.name)}</option>`).join('');
+}
+
+function updateInvoiceChildrenCheckboxVisibility() {
+  const pid = $('invoiceProject').value;
+  const hasChildren = pid && projectsCache.some(p => p.parentId === pid);
+  $('invoiceIncludeChildrenRow').classList.toggle('hidden', !hasChildren);
+  if (!hasChildren) $('invoiceIncludeChildren').checked = false;
+}
+$('invoiceProject').addEventListener('change', updateInvoiceChildrenCheckboxVisibility);
+
+function getInvoiceProjectIds() {
+  const pid = $('invoiceProject').value;
+  if (!pid) return [];
+  const includeChildren = $('invoiceIncludeChildren').checked && !$('invoiceIncludeChildrenRow').classList.contains('hidden');
+  if (!includeChildren) return [pid];
+  return [pid, ...projectsCache.filter(p => p.parentId === pid).map(p => p.id)];
+}
+
+// Groups matching entries by employee into one "Hours worked" line each,
+// resolving each employee's applicable sales rate (project-specific first,
+// falling back to their standard rate) as of their most recent entry date.
+function buildInvoiceLinesFromEntries(projectIds, dateFrom, dateTo) {
+  const matching = allEntriesCache.filter(en =>
+    projectIds.includes(en.projectId) && en.date >= dateFrom && en.date <= dateTo);
+  const byUser = {};
+  matching.forEach(en => {
+    const entryProject = projectById(en.projectId);
+    const { salesRate } = resolveProjectRate(entryProject, en.date, en.userId);
+    if (!byUser[en.userId]) byUser[en.userId] = { userName: en.userName, entries: [] };
+    byUser[en.userId].entries.push({ ...en, salesRate });
+  });
+  const result = {};
+  Object.keys(byUser).forEach(uid => {
+    const { userName, entries } = byUser[uid];
+    const totalHours = entries.reduce((s, e) => s + e.hours, 0);
+    const latest = [...entries].sort((a, b) => a.date.localeCompare(b.date)).pop();
+    result[uid] = {
+      userName,
+      mode: 'total',
+      lines: [{ desc: 'Hours worked', hours: totalHours, salesRate: latest.salesRate, entryIds: entries.map(e => e.id) }],
+      _rawEntries: entries
+    };
+  });
+  return result;
+}
+
+function splitInvoiceLinesByComment(uid) {
+  const emp = editingInvoiceLines[uid];
+  const groups = {};
+  emp._rawEntries.forEach(e => {
+    const key = (e.note && e.note.trim()) ? e.note.trim() : '(no comment)';
+    (groups[key] = groups[key] || []).push(e);
+  });
+  emp.mode = 'perComment';
+  emp.lines = Object.keys(groups).map(desc => {
+    const ents = groups[desc];
+    const latest = [...ents].sort((a, b) => a.date.localeCompare(b.date)).pop();
+    return { desc, hours: ents.reduce((s, e) => s + e.hours, 0), salesRate: latest.salesRate, entryIds: ents.map(e => e.id) };
+  });
+}
+function mergeInvoiceLinesToTotal(uid) {
+  const emp = editingInvoiceLines[uid];
+  const latest = [...emp._rawEntries].sort((a, b) => a.date.localeCompare(b.date)).pop();
+  emp.mode = 'total';
+  emp.lines = [{ desc: 'Hours worked', hours: emp._rawEntries.reduce((s, e) => s + e.hours, 0), salesRate: latest.salesRate, entryIds: emp._rawEntries.map(e => e.id) }];
+}
+
+function renderInvoiceLines() {
+  const container = $('invoiceLinesContainer');
+  const uids = Object.keys(editingInvoiceLines);
+  if (!uids.length) {
+    container.innerHTML = `<p class="empty-state">No hours found for this project and period.</p>`;
+    return;
+  }
+  container.innerHTML = uids.map(uid => {
+    const emp = editingInvoiceLines[uid];
+    const rows = emp.lines.map((line, idx) => `
+      <div class="invoice-line-row">
+        <input type="text" class="invoice-line-desc" data-uid="${uid}" data-idx="${idx}" value="${escapeHtml(line.desc)}" />
+        <input type="number" min="0" step="0.25" class="invoice-line-hours" data-uid="${uid}" data-idx="${idx}" value="${trimZeros(line.hours)}" />
+        <input type="number" min="0" step="1" class="rate-input invoice-line-rate" data-uid="${uid}" data-idx="${idx}" value="${line.salesRate}" />
+      </div>`).join('');
+    return `
+    <div class="invoice-employee-block">
+      <div class="invoice-employee-header">
+        <strong>${escapeHtml(emp.userName)}</strong>
+        <button type="button" class="link-btn invoice-split-toggle" data-uid="${uid}">${emp.mode === 'total' ? 'Split by comment' : 'Merge into one line'}</button>
+      </div>
+      <div class="invoice-line-legend"><span>Description</span><span>Hours</span><span>Rate (DKK/h)</span></div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+$('invoiceLinesContainer').addEventListener('click', (e) => {
+  const btn = e.target.closest('.invoice-split-toggle');
+  if (!btn) return;
+  const uid = btn.dataset.uid;
+  if (editingInvoiceLines[uid].mode === 'total') splitInvoiceLinesByComment(uid);
+  else mergeInvoiceLinesToTotal(uid);
+  renderInvoiceLines();
+});
+
+$('collectInvoiceHoursBtn').addEventListener('click', () => {
+  const projectIds = getInvoiceProjectIds();
+  const dateFrom = displayToIso($('invoiceFrom').value);
+  const dateTo = displayToIso($('invoiceTo').value);
+  if (!projectIds.length) { alert('Pick a project first.'); return; }
+  if (!dateFrom || !dateTo) { alert('Enter both a From and To date.'); return; }
+  editingInvoiceLines = buildInvoiceLinesFromEntries(projectIds, dateFrom, dateTo);
+  $('invoiceNewHoursBanner').classList.add('hidden');
+  renderInvoiceLines();
+});
+
+// Warns when reopening a draft if hours were logged (on the same project(s)
+// and dates) after it was created. "Add them" re-collects the whole period
+// fresh — simple and always correct, though it means any hand-edited hours
+// or rates on existing lines get reset too, so re-check them afterwards.
+function checkForNewInvoiceHours(invoice) {
+  const banner = $('invoiceNewHoursBanner');
+  const projectIds = invoice.includeChildren
+    ? [invoice.projectId, ...projectsCache.filter(p => p.parentId === invoice.projectId).map(p => p.id)]
+    : [invoice.projectId];
+  const capturedSet = new Set(invoice.capturedEntryIds || []);
+  const freshMatching = allEntriesCache.filter(en =>
+    projectIds.includes(en.projectId) && en.date >= invoice.dateFrom && en.date <= invoice.dateTo);
+  const newEntries = freshMatching.filter(en => !capturedSet.has(en.id));
+  if (!newEntries.length) { banner.classList.add('hidden'); return; }
+  const names = [...new Set(newEntries.map(e => e.userName))].join(', ');
+  banner.innerHTML = `New hours logged by <strong>${escapeHtml(names)}</strong> since this draft was created. <button type="button" id="addNewInvoiceHoursBtn" class="link-btn">Refresh to include them</button>`;
+  banner.classList.remove('hidden');
+  $('addNewInvoiceHoursBtn').addEventListener('click', () => {
+    editingInvoiceLines = buildInvoiceLinesFromEntries(projectIds, invoice.dateFrom, invoice.dateTo);
+    renderInvoiceLines();
+    banner.classList.add('hidden');
+    showStamp('Hours refreshed — remember to save');
+  });
+}
+
+function openInvoiceForm(invoice) {
+  editingInvoiceId = invoice ? invoice.id : null;
+  $('invoiceId').value = editingInvoiceId || '';
+  populateInvoiceProjectSelect(invoice ? invoice.projectId : '');
+  // Project/dates lock once a draft exists, so re-collecting can't silently
+  // change scope out from under a resumed edit — the "new hours" banner is
+  // the intended way to pull in additional entries afterwards.
+  $('invoiceProject').disabled = !!invoice;
+  $('invoiceFrom').disabled = !!invoice;
+  $('invoiceTo').disabled = !!invoice;
+  $('invoiceIncludeChildren').disabled = !!invoice;
+  $('collectInvoiceHoursBtn').classList.toggle('hidden', !!invoice);
+  $('invoiceNewHoursBanner').classList.add('hidden');
+
+  if (invoice) {
+    $('invoiceFrom').value = isoToDisplay(invoice.dateFrom);
+    $('invoiceTo').value = isoToDisplay(invoice.dateTo);
+    $('invoiceIncludeChildren').checked = !!invoice.includeChildren;
+    updateInvoiceChildrenCheckboxVisibility();
+    if (invoice.includeChildren) $('invoiceIncludeChildrenRow').classList.remove('hidden');
+
+    editingInvoiceLines = {};
+    Object.keys(invoice.linesByUser || {}).forEach(uid => {
+      const saved = invoice.linesByUser[uid];
+      const capturedIds = saved.lines.flatMap(l => l.entryIds);
+      editingInvoiceLines[uid] = {
+        userName: saved.userName,
+        mode: saved.mode,
+        lines: saved.lines.map(l => ({ ...l })),
+        _rawEntries: allEntriesCache.filter(en => capturedIds.includes(en.id))
+      };
+    });
+    renderInvoiceLines();
+    checkForNewInvoiceHours(invoice);
+  } else {
+    $('invoiceFrom').value = '';
+    $('invoiceTo').value = '';
+    $('invoiceIncludeChildren').checked = false;
+    updateInvoiceChildrenCheckboxVisibility();
+    editingInvoiceLines = {};
+    $('invoiceLinesContainer').innerHTML = '';
+  }
+
+  $('invoiceForm').classList.remove('hidden');
+  scrollFormIntoView($('invoiceForm'));
+}
+
+$('newInvoiceBtn').addEventListener('click', () => openInvoiceForm(null));
+$('cancelInvoiceBtn').addEventListener('click', () => $('invoiceForm').classList.add('hidden'));
+
+function readInvoiceLinesFromDom() {
+  const result = {};
+  Object.keys(editingInvoiceLines).forEach(uid => {
+    const emp = editingInvoiceLines[uid];
+    const lines = emp.lines.map((orig, idx) => {
+      const descEl = document.querySelector(`.invoice-line-desc[data-uid="${uid}"][data-idx="${idx}"]`);
+      const hoursEl = document.querySelector(`.invoice-line-hours[data-uid="${uid}"][data-idx="${idx}"]`);
+      const rateEl = document.querySelector(`.invoice-line-rate[data-uid="${uid}"][data-idx="${idx}"]`);
+      return {
+        desc: descEl ? descEl.value.trim() || orig.desc : orig.desc,
+        hours: hoursEl ? (parseFloat(hoursEl.value) || 0) : orig.hours,
+        salesRate: rateEl ? (parseFloat(rateEl.value) || 0) : orig.salesRate,
+        entryIds: orig.entryIds
+      };
+    });
+    result[uid] = { userName: emp.userName, mode: emp.mode, lines };
+  });
+  return result;
+}
+
+$('saveInvoiceDraftBtn').addEventListener('click', async () => {
+  const pid = $('invoiceProject').value;
+  if (!pid) { alert('Pick a project first.'); return; }
+  const dateFrom = displayToIso($('invoiceFrom').value);
+  const dateTo = displayToIso($('invoiceTo').value);
+  if (!dateFrom || !dateTo) { alert('Enter both a From and To date.'); return; }
+  if (!Object.keys(editingInvoiceLines).length) { alert('Collect hours first.'); return; }
+
+  const project = projectsCache.find(p => p.id === pid);
+  const includeChildren = !$('invoiceIncludeChildrenRow').classList.contains('hidden') && $('invoiceIncludeChildren').checked;
+  const linesByUser = readInvoiceLinesFromDom();
+  const capturedEntryIds = Object.values(linesByUser).flatMap(e => e.lines.flatMap(l => l.entryIds));
+
+  const payload = {
+    status: 'draft',
+    projectId: pid,
+    includeChildren,
+    clientId: project ? (project.clientId || null) : null,
+    dateFrom, dateTo,
+    linesByUser,
+    capturedEntryIds,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: currentUser.uid
+  };
+
+  if (editingInvoiceId) {
+    await db.collection('invoices').doc(editingInvoiceId).update(payload);
+  } else {
+    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    payload.createdBy = currentUser.uid;
+    await db.collection('invoices').add(payload);
+  }
+  $('invoiceForm').classList.add('hidden');
+  showStamp('Draft saved');
+});
+
+$('invoicesTableBody').addEventListener('click', async (e) => {
+  const editId = e.target.dataset.editInvoice;
+  const delId  = e.target.dataset.deleteInvoice;
+  if (editId) { openInvoiceForm(invoicesCache.find(i => i.id === editId)); return; }
+  if (delId) {
+    if (!confirm('Delete this invoice draft? This cannot be undone.')) return;
+    await db.collection('invoices').doc(delId).delete();
+    showStamp('Deleted');
+  }
 });
 
 function renderAbsenceCard() {

@@ -92,6 +92,59 @@
       </div>
     </div>
 
+    <section id="invoicesView" class="view hidden">
+      <div class="card">
+        <div class="card-header-row card-toggle" id="invoicesToggle" role="button" tabindex="0" aria-expanded="true">
+          <h2>Invoices <span class="beta-badge">Beta</span> <span class="chevron" id="invoicesChevron">▾</span></h2>
+        </div>
+        <div id="invoicesBody" class="collapsible-body">
+          <div class="row-actions" style="margin-bottom:12px">
+            <button type="button" id="newInvoiceBtn" class="btn btn-primary">+ New invoice</button>
+          </div>
+
+          <div id="invoiceForm" class="stacked-form hidden" style="margin-bottom:16px;padding:14px;border:1px solid var(--line);border-radius:8px">
+            <input type="hidden" id="invoiceId" />
+            <div class="field-row" style="grid-template-columns:2fr 1fr;align-items:end">
+              <label>Project
+                <select id="invoiceProject"></select>
+              </label>
+              <label class="checkbox-row hidden" id="invoiceIncludeChildrenRow" style="margin:0">
+                <input type="checkbox" id="invoiceIncludeChildren" />
+                Include all sub-projects
+              </label>
+            </div>
+            <div class="field-row" style="grid-template-columns:140px 140px 1fr;align-items:end">
+              <label>From
+                <input type="text" placeholder="dd-mm-yyyy" id="invoiceFrom" />
+              </label>
+              <label>To
+                <input type="text" placeholder="dd-mm-yyyy" id="invoiceTo" />
+              </label>
+              <label>&nbsp;
+                <button type="button" id="collectInvoiceHoursBtn" class="btn btn-ghost">Collect hours</button>
+              </label>
+            </div>
+
+            <p id="invoiceNewHoursBanner" class="hidden" style="background:#FFF3E0;color:#8A4B00;border-radius:6px;padding:8px 10px;font-size:0.82rem"></p>
+
+            <div id="invoiceLinesContainer"></div>
+
+            <div class="form-actions">
+              <button type="button" id="saveInvoiceDraftBtn" class="btn btn-primary">Save draft</button>
+              <button type="button" id="cancelInvoiceBtn" class="btn btn-ghost">Cancel</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="ledger-table">
+              <thead><tr><th>Project</th><th>Client</th><th>Period</th><th>Status</th><th class="num">Total</th><th></th></tr></thead>
+              <tbody id="invoicesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section id="userView" class="view hidden">
 
       <div class="wish-list-row">

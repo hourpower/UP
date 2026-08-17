@@ -23,6 +23,13 @@ service cloud.firestore {
         ];
     }
 
+    // Partners get read access to everyone's hours/rates for the Invoices
+    // card, even though they otherwise use the regular employee view.
+    function isPartner() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.employeeType == '1';
+    }
+
     // Each user's own profile doc (name, email, role)
     match /users/{userId} {
       allow read: if isSignedIn();
@@ -47,10 +54,15 @@ service cloud.firestore {
       allow write: if isEditor();
     }
 
-    // Cost/sales rates: editor can read/write all; users can read their own
+    // Cost/sales rates: editor/partner can read all (needed for invoicing); users can read their own
     match /rates/{userId} {
-      allow read: if isEditor() || request.auth.uid == userId;
+      allow read: if isEditor() || isPartner() || request.auth.uid == userId;
       allow write: if isEditor();
+    }
+
+    // Invoices: editors and partners can create/view/edit; regular employees have no access
+    match /invoices/{invoiceId} {
+      allow read, write: if isEditor() || isPartner();
     }
 
     // Office calendar (holidays/closing days): editors write, all users read
@@ -75,7 +87,7 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isEditor());
     }
     match /entries/{entryId} {
-      allow read: if isSignedIn() && (isEditor() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isEditor() || isPartner() || resource.data.userId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isSignedIn() &&
         (resource.data.userId == request.auth.uid || isEditor());

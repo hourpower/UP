@@ -1326,3 +1326,47 @@ span.access-cell-end,
   padding: 2px 8px;
   vertical-align: middle;
 }
+
+
+/* ==========================================================
+   Invoices — per-employee editable line items
+   ========================================================== */
+.invoice-employee-block {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.invoice-employee-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.invoice-line-legend {
+  display: grid;
+  grid-template-columns: 1fr 90px 130px;
+  gap: 8px;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding-bottom: 3px;
+}
+.invoice-line-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 130px;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.invoice-line-desc,
+.invoice-line-hours,
+.invoice-line-rate {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: #fff;
+  color: var(--ink);
+  width: 100%;
+}
