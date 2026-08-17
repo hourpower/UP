@@ -2528,6 +2528,15 @@ $('projectForm').addEventListener('submit', async (e) => {
     });
     clientId = newClientDoc.id;
   }
+
+  // A sub-project always mirrors its parent's client — force it from the
+  // parent's current record rather than trusting the form (which may be
+  // stale, e.g. if the parent's own client changed since this child was
+  // last saved, or the form was loaded without the change handler firing).
+  if (parentId) {
+    const parent = projectsCache.find(p => p.id === parentId);
+    if (parent) { clientId = parent.clientId || null; clientName = parent.client || ''; }
+  }
   const client = clientName;
 
   // Enforce max 10 children per parent
@@ -2543,6 +2552,18 @@ $('projectForm').addEventListener('submit', async (e) => {
     const updates = { name, code, category, client, clientId, description, parentId, rateLines };
     if (!isParent) { updates.expectedFee = expectedFee; updates.subadvisors = subadvisors; }
     await db.collection('projects').doc(editingProjectId).update(updates);
+
+    // If this project's own client just changed and it has sub-projects,
+    // push the new client down to every one of them immediately.
+    if (isParent) {
+      const children = projectsCache.filter(p => p.parentId === editingProjectId);
+      const changed = children.filter(c => c.clientId !== clientId);
+      if (changed.length) {
+        const batch = db.batch();
+        changed.forEach(c => batch.update(db.collection('projects').doc(c.id), { client, clientId }));
+        await batch.commit();
+      }
+    }
   } else {
     await db.collection('projects').add({
       name, code, category, client, clientId, description, parentId, expectedFee, subadvisors, rateLines,
@@ -2594,13 +2615,16 @@ $('projectsTable').addEventListener('click', async (e) => {
     $('projectName').value = p.name;
     $('projectCode').value = p.code || '';
     $('projectCategory').value = p.category || '';
-    populateClientSelect(p.clientId || null, p.client || '');
     // Parent setup
     const parentId = p.parentId || '';
+    const parent = parentId ? projectsCache.find(x => x.id === parentId) : null;
     $('projectParent').value = parentId;
     $('projectCategory').disabled = !!parentId;
     $('projectClient').disabled = !!parentId;
     if ($('clientSelect')) $('clientSelect').disabled = !!parentId;
+    // A sub-project always shows its parent's current client, not its own
+    // possibly-stale stored value (which only gets updated on save).
+    populateClientSelect(parent ? (parent.clientId || null) : (p.clientId || null), parent ? (parent.client || '') : (p.client || ''));
     updateFeeRowVisibility();
     $('projectDesc').value = p.description || '';
     $('projectExpectedFee').value = p.expectedFee || '';
@@ -3974,6 +3998,34 @@ $('clientForm').addEventListener('submit', async (e) => {
   }
   $('clientForm').classList.add('hidden');
   showStamp('Saved');
+});
+
+// Auto-fills name/address from the official CVR registry (cvrapi.dk — free,
+// public, no key needed). EAN numbers live in a separate registry and
+// aren't covered by this lookup, so that field is left for manual entry.
+$('cvrLookupBtn').addEventListener('click', async () => {
+  const cvr = $('clientCvr').value.trim().replace(/\D/g, '');
+  if (!/^\d{8}$/.test(cvr)) { alert('Enter a valid 8-digit CVR number first, then click Look up.'); return; }
+  const btn = $('cvrLookupBtn');
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Looking up…';
+  try {
+    const res = await fetch(`https://cvrapi.dk/api?search=${cvr}&country=dk`);
+    const data = await res.json();
+    if (data.error) { alert('CVR lookup failed: ' + data.error); return; }
+    if (data.name)          $('clientName').value = data.name;
+    if (data.address)       $('clientStreet').value = data.address;
+    if (data.zipcode != null) $('clientZip').value = String(data.zipcode);
+    if (data.city)          $('clientCity').value = data.city;
+    $('clientCountry').value = 'Danmark';
+    showStamp('Filled in from the CVR registry');
+  } catch (err) {
+    alert('CVR lookup failed — check your connection and try again.\n\n' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
 });
 
 $('clientsTableBody').addEventListener('click', async (e) => {

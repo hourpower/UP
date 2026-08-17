@@ -225,7 +225,10 @@
             </label>
             <div class="field-row">
               <label>CVR <span class="optional">at least one of CVR/EAN required</span>
-                <input type="text" id="clientCvr" />
+                <div style="display:flex;gap:6px">
+                  <input type="text" id="clientCvr" style="flex:1" />
+                  <button type="button" id="cvrLookupBtn" class="btn btn-ghost" style="white-space:nowrap">Look up</button>
+                </div>
               </label>
               <label>EAN
                 <input type="text" id="clientEan" />
