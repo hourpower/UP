@@ -3900,6 +3900,7 @@ function listenCompanySettings() {
     $('companyCity').value        = c.city         || '';
     $('companyCountry').value     = c.country      || 'Danmark';
     $('companyCvr').value         = c.cvr          || '';
+    $('companyBankName').value    = c.bankName     || '';
     $('companyBankReg').value     = c.bankReg      || '';
     $('companyBankAccount').value = c.bankAccount  || '';
   });
@@ -3914,6 +3915,7 @@ $('companySettingsForm').addEventListener('submit', async (e) => {
     city:        $('companyCity').value.trim(),
     country:     $('companyCountry').value.trim() || 'Danmark',
     cvr:         $('companyCvr').value.trim(),
+    bankName:    $('companyBankName').value.trim(),
     bankReg:     $('companyBankReg').value.trim(),
     bankAccount: $('companyBankAccount').value.trim(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
