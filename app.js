@@ -4020,7 +4020,8 @@ $('clientsTableBody').addEventListener('click', async (e) => {
   if (delId) {
     const inUse = projectsCache.filter(p => p.clientId === delId);
     if (inUse.length) {
-      alert(`Can't delete this client — it's linked to ${inUse.length} project${inUse.length > 1 ? 's' : ''}. Change those projects to a different client first.`);
+      const names = inUse.map(p => p.name).join('\n • ');
+      alert(`Can't delete this client — it's linked to ${inUse.length} project${inUse.length > 1 ? 's' : ''}. Change ${inUse.length > 1 ? 'those' : 'that'} project${inUse.length > 1 ? 's' : ''} to a different client first:\n\n • ${names}`);
       return;
     }
     const client = clientsCache.find(c => c.id === delId);
