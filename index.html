@@ -124,6 +124,12 @@
                 <button type="button" id="collectInvoiceHoursBtn" class="btn btn-ghost">Collect hours</button>
               </label>
             </div>
+            <label style="max-width:200px">VAT
+              <select id="invoiceVatRate">
+                <option value="0.25">25% (standard)</option>
+                <option value="0">0% (exempt)</option>
+              </select>
+            </label>
 
             <p id="invoiceNewHoursBanner" class="hidden" style="background:#FFF3E0;color:#8A4B00;border-radius:6px;padding:8px 10px;font-size:0.82rem"></p>
 
@@ -131,6 +137,7 @@
 
             <div class="form-actions">
               <button type="button" id="saveInvoiceDraftBtn" class="btn btn-primary">Save draft</button>
+              <button type="button" id="previewInvoicePdfBtn" class="btn btn-ghost">Preview PDF</button>
               <button type="button" id="cancelInvoiceBtn" class="btn btn-ghost">Cancel</button>
             </div>
           </div>

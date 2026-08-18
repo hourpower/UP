@@ -4185,6 +4185,7 @@ function renderInvoicesTable() {
       <td class="num">${formatDkk(invoiceTotal(inv))}</td>
       <td class="row-actions">
         <button class="link-btn" data-edit-invoice="${inv.id}">Edit</button>
+        <button class="link-btn" data-pdf-invoice="${inv.id}">Preview PDF</button>
         <button class="link-btn link-danger" data-delete-invoice="${inv.id}">Delete</button>
       </td>
     </tr>`;
@@ -4355,6 +4356,7 @@ function openInvoiceForm(invoice) {
     $('invoiceFrom').value = isoToDisplay(invoice.dateFrom);
     $('invoiceTo').value = isoToDisplay(invoice.dateTo);
     $('invoiceIncludeChildren').checked = !!invoice.includeChildren;
+    $('invoiceVatRate').value = invoice.vatRate != null ? String(invoice.vatRate) : '0.25';
     updateInvoiceChildrenCheckboxVisibility();
     if (invoice.includeChildren) $('invoiceIncludeChildrenRow').classList.remove('hidden');
 
@@ -4375,6 +4377,7 @@ function openInvoiceForm(invoice) {
     $('invoiceFrom').value = '';
     $('invoiceTo').value = '';
     $('invoiceIncludeChildren').checked = false;
+    $('invoiceVatRate').value = '0.25';
     updateInvoiceChildrenCheckboxVisibility();
     editingInvoiceLines = {};
     $('invoiceLinesContainer').innerHTML = '';
@@ -4386,6 +4389,161 @@ function openInvoiceForm(invoice) {
 
 $('newInvoiceBtn').addEventListener('click', () => openInvoiceForm(null));
 $('cancelInvoiceBtn').addEventListener('click', () => $('invoiceForm').classList.add('hidden'));
+
+// Generates an unnumbered, watermarked preview PDF for a draft invoice —
+// works both for an already-saved invoice (from the table) and for the
+// form's current unsaved state (from the "Preview PDF" button while editing).
+async function generateInvoicePreviewPdf(invoice) {
+  if (!invoice) return;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 18;
+  const INK = [28, 42, 46];
+  const SOFT = [130, 130, 130];
+  const num = (n) => n.toLocaleString('da-DK', { maximumFractionDigits: 2 });
+
+  const company = companySettingsCache || {};
+  const client = clientsCache.find(c => c.id === invoice.clientId) || {};
+  const project = projectsCache.find(p => p.id === invoice.projectId);
+
+  let y = 16;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(200, 60, 40);
+  doc.text('DRAFT — PREVIEW, NOT A FINAL INVOICE', W - M, y, { align: 'right' });
+
+  const logoData = await loadLogoBase64();
+  if (logoData) doc.addImage(logoData, 'PNG', M, y - 4, 14, 14);
+
+  y += 12;
+  doc.setFontSize(20);
+  doc.setTextColor(...INK);
+  doc.text('FAKTURA', M, y);
+  y += 12;
+
+  // Debitor (left) / Kreditor (right)
+  const colW = (W - 2 * M - 10) / 2;
+  const leftX = M, rightX = M + colW + 10;
+  let ly = y, ry = y;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SOFT);
+  doc.text('DEBITOR', leftX, ly);
+  doc.text('KREDITOR', rightX, ry);
+  ly += 5; ry += 5;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...INK);
+  [client.name, client.attention, client.street, `${client.zip || ''} ${client.city || ''}`.trim(), client.country]
+    .filter(Boolean).forEach(line => { doc.text(line, leftX, ly); ly += 5; });
+  [company.name, company.street, `${company.zip || ''} ${company.city || ''}`.trim(), company.country, company.cvr ? `CVR: ${company.cvr}` : null]
+    .filter(Boolean).forEach(line => { doc.text(line, rightX, ry); ry += 5; });
+
+  y = Math.max(ly, ry) + 8;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(...SOFT);
+  doc.text('PROJEKT', leftX, y);
+  doc.text('FAKTURANR.', rightX, y);
+  doc.text('BOGFØRINGSDATO', rightX, y + 7);
+  doc.text('BETALINGSDATO', rightX, y + 14);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.setTextColor(...INK);
+  doc.text(project ? project.name : '—', leftX, y + 5);
+  const today = new Date();
+  const dueDays = client.paymentTermsDays != null ? client.paymentTermsDays : 14;
+  const dueDate = addDays(today, dueDays);
+  doc.text('DRAFT', rightX + 35, y);
+  doc.text(today.toLocaleDateString('da-DK'), rightX + 35, y + 7);
+  doc.text(dueDate.toLocaleDateString('da-DK'), rightX + 35, y + 14);
+
+  y += 24;
+
+  // Line items — one row per invoice line, across every employee
+  const vatRate = invoice.vatRate || 0;
+  const rows = [];
+  let lineNo = 100;
+  Object.values(invoice.linesByUser || {}).forEach(emp => {
+    emp.lines.forEach(line => {
+      lineNo++;
+      const desc = (emp.lines.length > 1 || line.desc !== 'Hours worked')
+        ? `${emp.userName} — ${line.desc}` : emp.userName;
+      rows.push([String(lineNo), desc, num(line.hours), 'timer', num(line.salesRate), `${Math.round(vatRate * 100)}%`, num(line.hours * line.salesRate)]);
+    });
+  });
+
+  doc.autoTable({
+    startY: y,
+    margin: { left: M, right: M },
+    head: [['Varenr.', 'Varetekst', 'Antal', 'Enhed', 'Stykpris', 'Moms%', 'Total pris']],
+    body: rows,
+    headStyles: { fillColor: INK, textColor: [255, 255, 255], fontSize: 8, fontStyle: 'bold', cellPadding: 2.5 },
+    bodyStyles: { fontSize: 8.5, textColor: INK, cellPadding: 2.5 },
+    columnStyles: {
+      0: { cellWidth: 16 }, 2: { cellWidth: 16, halign: 'right' }, 3: { cellWidth: 16 },
+      4: { cellWidth: 26, halign: 'right' }, 5: { cellWidth: 16, halign: 'right' }, 6: { cellWidth: 28, halign: 'right' }
+    }
+  });
+
+  let ty = doc.lastAutoTable.finalY + 8;
+  const totalExcl = Object.values(invoice.linesByUser || {})
+    .reduce((sum, emp) => sum + emp.lines.reduce((s, l) => s + l.hours * l.salesRate, 0), 0);
+  const vat = totalExcl * vatRate;
+  const totalIncl = totalExcl + vat;
+
+  const totalsLabelX = W - M - 55;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...INK);
+  doc.text('Total excl. moms', totalsLabelX, ty);
+  doc.text(`${num(totalExcl)} kr.`, W - M, ty, { align: 'right' });
+  ty += 6;
+  doc.text(`Moms (${Math.round(vatRate * 100)}%)`, totalsLabelX, ty);
+  doc.text(`${num(vat)} kr.`, W - M, ty, { align: 'right' });
+  ty += 8;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.text('Total DKK', totalsLabelX, ty);
+  doc.text(`${num(totalIncl)} kr.`, W - M, ty, { align: 'right' });
+
+  const bankLine = [company.bankName, (company.bankReg && company.bankAccount) ? `Reg. ${company.bankReg}  Konto ${company.bankAccount}` : null]
+    .filter(Boolean).join('  ·  ');
+  if (bankLine) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...SOFT);
+    doc.text(bankLine, M, H - 10);
+  }
+
+  doc.save(`faktura-preview-${(project ? project.name : 'draft').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`);
+}
+
+function buildInvoiceObjectFromForm() {
+  const pid = $('invoiceProject').value;
+  const project = projectsCache.find(p => p.id === pid);
+  return {
+    projectId: pid,
+    includeChildren: !$('invoiceIncludeChildrenRow').classList.contains('hidden') && $('invoiceIncludeChildren').checked,
+    clientId: project ? (project.clientId || null) : null,
+    dateFrom: displayToIso($('invoiceFrom').value),
+    dateTo: displayToIso($('invoiceTo').value),
+    vatRate: parseFloat($('invoiceVatRate').value) || 0,
+    linesByUser: readInvoiceLinesFromDom()
+  };
+}
+
+$('previewInvoicePdfBtn').addEventListener('click', () => {
+  if (!$('invoiceProject').value) { alert('Pick a project first.'); return; }
+  if (!Object.keys(editingInvoiceLines).length) { alert('Collect hours first.'); return; }
+  generateInvoicePreviewPdf(buildInvoiceObjectFromForm());
+});
 
 function readInvoiceLinesFromDom() {
   const result = {};
@@ -4426,6 +4584,7 @@ $('saveInvoiceDraftBtn').addEventListener('click', async () => {
     includeChildren,
     clientId: project ? (project.clientId || null) : null,
     dateFrom, dateTo,
+    vatRate: parseFloat($('invoiceVatRate').value) || 0,
     linesByUser,
     capturedEntryIds,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -4446,7 +4605,9 @@ $('saveInvoiceDraftBtn').addEventListener('click', async () => {
 $('invoicesTableBody').addEventListener('click', async (e) => {
   const editId = e.target.dataset.editInvoice;
   const delId  = e.target.dataset.deleteInvoice;
+  const pdfId  = e.target.dataset.pdfInvoice;
   if (editId) { openInvoiceForm(invoicesCache.find(i => i.id === editId)); return; }
+  if (pdfId)  { generateInvoicePreviewPdf(invoicesCache.find(i => i.id === pdfId)); return; }
   if (delId) {
     if (!confirm('Delete this invoice draft? This cannot be undone.')) return;
     await db.collection('invoices').doc(delId).delete();
