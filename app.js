@@ -4266,6 +4266,14 @@ function mergeInvoiceLinesToTotal(uid) {
   emp.lines = [{ desc: 'Hours worked', hours: emp._rawEntries.reduce((s, e) => s + e.hours, 0), salesRate: latest.salesRate, entryIds: emp._rawEntries.map(e => e.id) }];
 }
 
+// Plain period-decimal number for <input type="number"> values — trimZeros()
+// formats with a Danish comma, which HTML number inputs reject as invalid,
+// silently blanking the field for any non-whole-number value.
+function numForInput(n) {
+  const s = Number(n).toFixed(2).replace(/\.?0+$/, '');
+  return s === '' ? '0' : s;
+}
+
 function renderInvoiceLines() {
   const container = $('invoiceLinesContainer');
   const uids = Object.keys(editingInvoiceLines);
@@ -4278,7 +4286,7 @@ function renderInvoiceLines() {
     const rows = emp.lines.map((line, idx) => `
       <div class="invoice-line-row">
         <input type="text" class="invoice-line-desc" data-uid="${uid}" data-idx="${idx}" value="${escapeHtml(line.desc)}" />
-        <input type="number" min="0" step="0.25" class="invoice-line-hours" data-uid="${uid}" data-idx="${idx}" value="${trimZeros(line.hours)}" />
+        <input type="number" min="0" step="0.25" class="invoice-line-hours" data-uid="${uid}" data-idx="${idx}" value="${numForInput(line.hours)}" />
         <input type="number" min="0" step="1" class="rate-input invoice-line-rate" data-uid="${uid}" data-idx="${idx}" value="${line.salesRate}" />
       </div>`).join('');
     return `
@@ -4553,10 +4561,12 @@ function readInvoiceLinesFromDom() {
       const descEl = document.querySelector(`.invoice-line-desc[data-uid="${uid}"][data-idx="${idx}"]`);
       const hoursEl = document.querySelector(`.invoice-line-hours[data-uid="${uid}"][data-idx="${idx}"]`);
       const rateEl = document.querySelector(`.invoice-line-rate[data-uid="${uid}"][data-idx="${idx}"]`);
+      const parsedHours = hoursEl ? parseFloat(hoursEl.value) : NaN;
+      const parsedRate  = rateEl  ? parseFloat(rateEl.value)  : NaN;
       return {
         desc: descEl ? descEl.value.trim() || orig.desc : orig.desc,
-        hours: hoursEl ? (parseFloat(hoursEl.value) || 0) : orig.hours,
-        salesRate: rateEl ? (parseFloat(rateEl.value) || 0) : orig.salesRate,
+        hours: !isNaN(parsedHours) ? parsedHours : orig.hours,
+        salesRate: !isNaN(parsedRate) ? parsedRate : orig.salesRate,
         entryIds: orig.entryIds
       };
     });
